@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+        <meta charset="UTF-8">
+        <meta name="xy-build" content="20261024-ui1">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>乡音药箱</title>
+        <!-- PWA：让"添加到主屏幕"后能用独立图标、全屏打开（看不到地址栏） -->
+        <link rel="manifest" href="manifest.json">
+        <meta name="theme-color" content="#0B3A28">
+        <link rel="icon" type="image/png" href="icon-192.png">
+        <link rel="apple-touch-icon" href="icon-192.png">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="default">
+        <meta name="apple-mobile-web-app-title" content="乡音药箱">
+            <link rel="stylesheet" href="ui_steps.css?v=20261028-step1">
+
+</head>
+<body>
+<main class="app" id="flowApp" data-flow="photo">
+  <header class="brand"><div class="avatar" role="img" aria-label="乡音药箱老人形象"></div><div><h1>乡音药箱</h1><p>广西老乡的用药帮手</p></div><button class="brand-help" id="openHelp" aria-label="使用帮助" type="button">?</button></header>
+  <button class="county-bar" id="openLocation" type="button" aria-label="打开县区设置"><span aria-hidden="true">⌖</span><span id="countyQuickLabel">正在获取设备建议…</span><span class="setting">设置 ›</span></button>
+  <ol class="steps" aria-label="问药步骤"><li data-step="1"><span>1</span>拍药盒</li><li data-step="2"><span>2</span>问一句</li><li data-step="3"><span>3</span>听回答</li></ol>
+  <div class="flow-content">
+    <section class="flow-panel centered" id="photoSection" tabindex="-1" aria-labelledby="photoTitle"><div class="soft-tag">第一步</div><h2 id="photoTitle">先拍一下药盒</h2><button id="cameraTarget" class="photo-target" type="button" aria-label="打开相机拍药盒"><span class="tile" aria-hidden="true"><span class="art art-cam"></span></span></button><p class="photo-tip">药名朝前，拍清楚一点</p><p class="help-copy">先认准手中这盒药，<br>再问它怎么用。</p></section>
+    <section class="flow-panel" id="identitySection" hidden tabindex="-1" aria-labelledby="identityTitle"><p class="status-note positive">已读到对应的药品资料</p><h2 id="identityTitle">是手中这盒药吗？</h2><div id="recognitionCard" class="identity-top"><img id="preview" alt="本次选择的药盒照片"><div id="recognitionSummary"><div id="recognitionTitle" hidden>药盒照片</div><div id="recognizedDrug" class="medicine-name"></div><div id="recognizedMeta" class="medicine-spec"></div></div></div><p class="help-copy">请核对药名、规格。<br>确认后，下一步再提问。</p><button id="openOcr" class="text-btn" type="button">查看识别文字与匹配依据</button></section>
+    <section class="flow-panel question-card" id="questionSection" hidden tabindex="-1" aria-labelledby="questionTitle"><div class="mini-identity" data-product-summary></div><h2 id="questionTitle" class="question-title">您想问这盒药什么？</h2><div class="language-row"><span id="languageLabel">桂柳话 / 普通话（试用）</span><button id="openLanguage" class="text-btn" type="button">切换</button></div><button id="btnMic" class="primary mic-button" type="button" aria-pressed="false"><span class="mic-words"><span class="action-label">按住说话</span><small>说完松手</small></span><span class="tile" aria-hidden="true"><span class="art art-mic"></span></span></button><div id="questionPreview" class="question-preview empty">说完的话会显示在这里</div><div id="voiceStatus" role="status">按住按钮，说完松手</div><button id="openTyping" class="text-btn link-row typing-open" type="button"><span class="pen-art" aria-hidden="true"></span>也可以打字问</button><div id="askStatus" role="status"></div></section>
+    <section class="flow-panel centered wait-panel" id="waitingSection" hidden tabindex="-1" aria-labelledby="waitTitle"><div class="spinner" aria-hidden="true">▣</div><h2 id="waitTitle">正在识别药盒…</h2><p id="waitMessage" class="help-copy">正在读取药名和规格，<br>请稍等一下。</p><div id="waitPill" class="waiting-pill">识别中</div><p id="waitQuestion" class="question-echo" hidden></p></section>
+    <section class="flow-panel centered" id="unmatchedSection" hidden tabindex="-1" aria-labelledby="unmatchedTitle"><div class="stop-symbol" aria-hidden="true">!</div><h2 id="unmatchedTitle" class="stop-heading">这张还没认准</h2><p id="unmatchedMessage" class="help-copy">请让药名朝着镜头，<br>尽量只拍一盒，避开反光。</p><p class="status-note">没认准具体药品，暂不进入问药。</p><button id="openOcrFailure" class="text-btn" type="button">查看本次识别详情</button></section>
+    <section class="flow-panel answer-card" id="answerSection" hidden tabindex="-1" aria-labelledby="answerHeading"><h2 id="answerHeading" hidden>这次的回答</h2><div class="mini-identity" data-product-summary></div><p id="askedQuestion" class="question-echo"></p><div class="answer-topline"><span id="answerLabel" class="answer-status">说明书讲解</span><button id="openEvidence" class="text-btn" type="button" hidden>看依据</button></div><div id="answerPage" class="answer-read" tabindex="0" role="region" aria-label="当前页回答"></div><div id="answerPager" class="pager" hidden><button id="answerPrev" type="button">上一页</button><span id="answerPageCount" aria-live="polite"></span><button id="answerNext" type="button">下一页</button></div><p id="pageScrollHint" class="page-hint" hidden>本段较长，可在文字框内上滑查看全文。</p></section>
+  </div>
+  <footer class="flow-footer">
+    <div id="photoActions" class="action-group"><button id="btnPhoto" class="primary" type="button"><span class="tile" aria-hidden="true"><span class="art art-cam"></span></span><span class="action-label">拍一下药盒</span></button><button id="btnGallery" class="primary" type="button"><span class="tile" aria-hidden="true"><span class="art art-gallery"></span></span><span>从照片选择</span></button><input type="file" id="fileInput" accept="image/*" hidden></div>
+    <div id="identityActions" class="action-group" hidden><button id="confirmProduct" class="primary" type="button">就是这盒，下一步</button><button id="wrongProduct" class="secondary switch-drug" type="button">不对，重新拍</button></div>
+    <div id="questionActions" class="action-group" hidden><button id="btnAsk" class="primary gold" type="button"><span class="tile" aria-hidden="true"><span class="art art-ask"></span></span><span class="action-label">开始问药</span></button><button id="changeDrugQuestion" class="secondary switch-drug" type="button"><span class="tile" aria-hidden="true"><span class="art art-cam"></span></span><span>换一盒药，重新拍</span></button></div>
+    <div id="waitingActions" class="action-group" hidden><button id="cancelCurrent" class="secondary switch-drug" type="button">取消，返回修改</button></div>
+    <div id="unmatchedActions" class="action-group" hidden><button id="retryPhoto" class="primary" type="button"><span class="tile" aria-hidden="true"><span class="art art-cam"></span></span><span>重新拍一张</span></button><button id="retryGallery" class="secondary" type="button">从照片选择</button></div>
+    <div id="answerActions" class="action-group" hidden><div id="voiceControls" class="voice-controls"><button id="btnSpeak" class="primary" type="button"><span class="tile" aria-hidden="true"><span class="art art-speak"></span></span><span class="action-label">乡音重听</span></button><button id="btnSpeakPutong" class="secondary" type="button"><span class="tile" aria-hidden="true"><span class="art art-speak2"></span></span><span class="action-label">听普通话</span></button></div><div id="speakStatus" role="status"></div><button id="continueQuestion" class="primary" type="button">继续问这盒药</button><button id="changeDrugAnswer" class="secondary switch-drug" type="button"><span class="tile" aria-hidden="true"><span class="art art-cam"></span></span><span class="switch-label"><span>换一盒药，</span><span>重新拍</span></span></button></div>
+  </footer>
+  <div class="footnote">只讲说明书里的信息，不替代医生诊疗</div><div id="flowToast" class="toast" hidden role="status"></div>
+</main>
+<dialog id="typingDialog" aria-labelledby="typingTitle"><div class="dialog-head"><h2 id="typingTitle">直接打字问</h2><button class="close-dialog" data-close-dialog type="button" aria-label="关闭打字窗口">×</button></div><div class="dialog-body"><label for="askInput" id="askHint">您想问这盒药什么？</label><textarea id="askInput" placeholder="例如：这个药一天吃几次？" rows="3"></textarea><div id="typingError" role="alert" hidden>请先输入您想问的问题。</div><div class="dialog-actions"><button id="saveQuestion" class="primary" type="button">用这个问题</button></div></div></dialog>
+<dialog id="languageDialog" aria-labelledby="languageTitle"><div class="dialog-head"><h2 id="languageTitle">选择说话方式</h2><button class="close-dialog" data-close-dialog type="button" aria-label="关闭说话方式窗口">×</button></div><div class="dialog-body"><label for="asrProvider">说话方式</label><select id="asrProvider"><option value="fun-asr">桂柳话／普通话（试用）</option><option value="baidu">普通话</option></select><p class="muted">选择的是听您说话的方式。回答有对应乡音录音时，仍优先使用乡音。</p><button id="saveLanguage" class="primary" type="button">就用这个</button></div></dialog>
+<dialog id="locationDialog" aria-labelledby="locationTitle"><div class="dialog-head"><h2 id="locationTitle">所在县区 · 可不提供</h2><button class="close-dialog" data-close-dialog type="button" aria-label="关闭县区设置">×</button></div><div class="dialog-body"><section id="regionBox" aria-label="所在县区"><span id="locationBadge">获取中</span><div id="locationCounty">正在获取设备建议…</div><p id="locationSummary">不提供位置，也可以拍照和问药。</p><div class="locationActions"><button id="confirmLocation" class="small-btn filled" type="button" hidden>位置正确</button><button id="rejectLocation" class="small-btn" type="button">更换县区</button></div><section id="manualLocationPanel" hidden aria-label="人工校准县区"><p><b>选择实际所在县区</b></p><p>结果标为人工校准，不冒充GPS定位。</p><label>所在市<select id="manualCity"><option value="">请选择市</option></select></label><label>县／区<select id="manualCounty" disabled><option value="">请先选市</option></select></label><p id="manualLocationMessage" role="status"></p><button id="applyManualLocation" class="small-btn filled" type="button" disabled>使用所选县区</button><button id="cancelManualLocation" class="small-btn" type="button">暂不提供位置</button></section><details id="locationDetails"><summary>位置说明、重试与记住设置</summary><div id="locationStatus">正在获取设备建议。允许或拒绝定位都可以正常问药；县区由您确认后才使用。</div><label id="rememberLocationLabel"><input id="rememberLocation" type="checkbox" checked>记住本设备县区，下次仍需确认，30天后失效</label><div class="detail-actions"><button id="retryLocation" class="text-btn" type="button">重新获取建议</button><button id="skipLocation" class="text-btn" type="button">不提供位置</button></div><button id="forgetLocation" class="text-btn" type="button" hidden>清除记住的县区</button><div id="regionTip">自动结果可能不准，未经您确认不计入县区地图。不保存坐标；勾选记住时仅在本浏览器保存县区，换地方请重新选择。识别文字、问题与回答保存在本机供人工核查，不保存照片和录音。</div></details></section></div></dialog>
+<dialog id="evidenceDialog" aria-labelledby="evidenceTitle"><div class="dialog-head"><h2 id="evidenceTitle">这条回答的依据</h2><button class="close-dialog" data-close-dialog type="button" aria-label="关闭依据">×</button></div><div class="dialog-body"><div id="citationBox"></div></div></dialog>
+<dialog id="ocrDialog" aria-labelledby="ocrTitle"><div class="dialog-head"><h2 id="ocrTitle">识别文字与匹配依据</h2><button class="close-dialog" data-close-dialog type="button" aria-label="关闭识别依据">×</button></div><div class="dialog-body"><div id="ocrDetails"><div id="result"></div></div></div></dialog>
+<dialog id="helpDialog" aria-labelledby="helpTitle"><div class="dialog-head"><h2 id="helpTitle">拍一盒，问一句，听回答</h2><button class="close-dialog" data-close-dialog type="button" aria-label="关闭帮助">×</button></div><div class="dialog-body"><p>1. 点击相机或“拍一下药盒”，打开手机相机后再按快门；也可以从已有照片选择。</p><p>2. 确认药名与规格，再按住说话或打字提问。</p><p>3. 回答有对应乡音录音时优先播乡音，也可重听或切换普通话。</p><p>“继续问这盒药”保留药品；“换一盒药”会清空上一盒的问答。</p><p class="muted">只帮助读懂当前收录药品的说明书，不替代医生或药师。县区仅用于统计，允许、拒绝定位都不影响问药。</p></div></dialog>
+<div class="business-bridge" hidden><div id="voiceText"></div><div id="answer"></div><div id="photoHint"></div><div id="answerEmpty"></div><div id="answerPending"></div><div id="answerDone"></div><audio id="player" preload="auto" playsinline></audio><audio id="voicePlayer" preload="auto" playsinline webkit-playsinline></audio></div>
+
+<script src="recorder.js"></script>
+<script>
+        // ==================== 预热麦克风权限 ====================
+    // 为什么要有这一段：
+    // 手机第一次按住"按住说话"时，浏览器才弹权限框；
+    // 用户一松手去点"允许"，这次录音其实还没开始，就白按了。
+    // 所以页面一打开就先申请一次权限 —— 等真正按住说话时，权限已经在手，就是秒开。
+    //
+    // ★ 关键：这次拿到后**不松手**（交给 recorder.js 缓存住）。
+    //   因为有些手机浏览器（实测 OPPO 自带）对自签证书网站不记住权限，
+    //   一关掉麦克风，下次就得重新申请、又会弹框。缓存住就只弹这一次。
+    Recorder.warmup();
+
+
+    var btn = document.getElementById('btnPhoto');
+        var result = document.getElementById('result');
+    var fileInput = document.getElementById('fileInput');
+    var preview = document.getElementById('preview');
+
+    // ============================================================
+    // ★★ 任务编号（2026-10-16 新增）—— 解决"换药后旧结果晚到并覆盖"
+    //
+    // 复现过的故障：药A 的问答还在跑，老人已经切到药B。
+    //   A 的答案晚到 → 直接写进页面，老人看到的是"A 的答案 + B 的药盒"。
+    //   更糟的一种：A 已经拒答了，旧 TTS 音频才回来，**又重新播了一遍**。
+    //
+    // 做法很土但有效（这也是浏览器里唯一稳的办法）：
+    //   每换一张照片 / 每问一次，taskSeq 加一；
+    //   每个异步回调都记住"我是第几代"，回来时先核对 —— 不是最新的一代就直接丢掉，
+    //   **连界面都不许碰，更不许播放声音**。
+    // （fetch 没有真正的取消接口；AbortController 在国产手机浏览器上不稳，
+    //   所以用"回来先验号"这个办法，兼容性最好。）
+    // ============================================================
+    var taskSeq = 0;
+    var pendingRequests = [];
+    var locationRequests = [], countyRequests = [];
+    var ocrWords = '';
+    var ocrBusy = false;
+    var voiceBusy = false;
+    var activeVoice = null;
+    var previewUrl = '';
+
+    // 超时覆盖响应体读取；即使浏览器不支持 AbortController，也会解锁界面。
+    function requestData(url, options, timeoutMs, readResponse, requestPool) {
+        var pool = requestPool || pendingRequests;
+        return new Promise(function (resolve, reject) {
+            var settled = false;
+            var controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+            var timer;
+            function finish(error, value) {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                var index = pool.indexOf(cancel);
+                if (index >= 0) pool.splice(index, 1);
+                if (error) reject(error); else resolve(value);
+            }
+            function cancel() {
+                finish(new Error('本次请求已取消'));
+                if (controller) controller.abort();
+            }
+            pool.push(cancel);
+            timer = setTimeout(function () {
+                finish(new Error('等待超时，请再试一次'));
+                if (controller) controller.abort();
+            }, timeoutMs);
+            if (controller) options.signal = controller.signal;
+            Promise.resolve().then(function () { return fetch(url, options); })
+            .then(function (response) {
+                if (!response.ok) throw new Error('服务器返回 ' + response.status);
+                return readResponse(response);
+            }).then(function (value) { finish(null, value); }, function (error) { finish(error); });
+        });
+    }
+
+    function postJSON(url, payload, timeoutMs, requestPool) {
+        return requestData(url, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }, timeoutMs, function (response) { return response.json(); }, requestPool);
+    }
+
+    function newTask() {
+        taskSeq = taskSeq + 1;
+        pendingRequests.slice().forEach(function (cancel) { cancel(); });
+        return taskSeq;
+    }
+
+    function stopPlayback() {
+        speakToken = speakToken + 1;
+        cancelVoiceAttempt();
+        activeVoice = null;
+        voiceFile = '';
+        currentVoicePlan = null;
+        player.onended = player.onerror = null;
+        voicePlayer.onended = voicePlayer.onerror = null;
+        try { player.pause(); player.removeAttribute('src'); player.load(); } catch (error) {}
+        try { voicePlayer.pause(); voicePlayer.removeAttribute('src'); voicePlayer.load(); } catch (error) {}
+        if (lastAudioUrl) URL.revokeObjectURL(lastAudioUrl);
+        lastAudioUrl = '';
+        lastAudioText = '';
+        btnSpeak.style.display = 'none';
+        btnSpeakPutong.style.display = 'none';
+        speakStatus.textContent = '';
+    }
+
+    function resetForNewTask() {
+        stopPlayback();
+        answer.textContent = '';
+        clearCitation();
+        lastQuestion = '';
+        lastInputFrom = 'text';
+        voiceText.textContent = '';
+        askInput.value = '';
+        btnAsk.disabled = false;
+        ocrWords = '';
+        recognitionId = '';
+        voiceBusy = false;
+        if (typeof Recorder.cancel === 'function') Recorder.cancel();
+    }
+
+    btn.onclick = function () {
+        fileInput.click();
+    };
+    function prepareOCRImage(dataURL) {
+        // 大图原文件保留；仅压缩本次上传副本，避免手机实拍超过OCR接口限制。
+        if (dataURL.length < 3500000) return Promise.resolve(dataURL);
+        return new Promise(function (resolve, reject) {
+            var image = new Image();
+            image.onload = function () {
+                var scale = Math.min(1, 2048 / Math.max(image.width, image.height));
+                var canvas = document.createElement('canvas');
+                canvas.width = Math.max(1, Math.round(image.width * scale));
+                canvas.height = Math.max(1, Math.round(image.height * scale));
+                var ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+                var output = canvas.toDataURL('image/jpeg', 0.88);
+                if (output.length >= 3500000) output = canvas.toDataURL('image/jpeg', 0.65);
+                if (output.length >= 3500000) { reject(new Error('照片过大，请靠近药盒重拍')); return; }
+                resolve(output);
+            };
+            image.onerror = function () { reject(new Error('照片格式无法读取，请使用JPG或PNG照片')); };
+            image.src = dataURL;
+        });
+    }
+    fileInput.onchange = function () {
+        var file = fileInput.files[0];
+        if (!file) return;
+
+        // ★★ 换照片 = 开新任务，上一盒药的一切全部作废（编号 +1 在最前面）
+        var myTask = newTask();
+
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        previewUrl = URL.createObjectURL(file);
+        preview.src = previewUrl;
+        preview.style.display = 'block';
+        resetForNewTask();
+        ocrBusy = true;
+        result.textContent = '正在识别，请稍等…';
+        askStatus.textContent = '先拍药盒，再说话或打字提问';
+
+        var reader = new FileReader();
+
+        reader.onload = function () {
+            if (myTask !== taskSeq) return;      // ★ 期间已经换药了 → 这次识别作废
+            prepareOCRImage(reader.result).then(function (uploadImage) {
+                if (myTask !== taskSeq) return null;
+                return postJSON('/api/ocr', { image: uploadImage, city:regionCode, location_status:locationState }, 65000);
+            })
+            .then(function (data) {
+                if (myTask !== taskSeq) return;  // ★ 又换了药 → 这次结果直接丢掉
+                ocrBusy = false;
+                if (data.ok && Array.isArray(data.lines)) {
+                    recognitionId = data.recognition_id || '';
+                    ocrWords = (Array.isArray(data.raw_lines) ? data.raw_lines : data.lines).join('\n');
+                    result.textContent = '识别到 ' + data.lines.length + ' 行药盒文字：\n\n' + data.lines.join('\n');
+                    if (data.product) result.textContent += '\n\n已匹配实物资料：' + data.product.药名 + ' / ' + data.product.规格 + '\n核对依据：' + data.product.依据;
+                } else {
+                    result.textContent = '识别失败：' + data.error;
+                }
+                if (window.XYStepUI) window.XYStepUI.ocrFinished(data);
+            })
+            .catch(function (err) {
+                if (myTask !== taskSeq) return;
+                ocrBusy = false;
+                result.textContent = '请求出错：' + err;
+            });
+
+        };
+
+        reader.onerror = function () {
+            if (myTask !== taskSeq) return;
+            ocrBusy = false;
+            result.textContent = '照片没有读成功，请重新拍照';
+        };
+        reader.readAsDataURL(file);
+
+
+    };
+    // ==================== 语音提问 ====================
+    var btnMic = document.getElementById('btnMic');
+    var voiceStatus = document.getElementById('voiceStatus');
+    var voiceText = document.getElementById('voiceText');
+
+    // 鼠标：按下开始录，松开就发送
+    var recordingTask = 0;
+    function startVoice() {
+        if (ocrBusy) { setVoiceStatus('药盒还在识别，请稍候'); return; }
+        recordingTask = newTask();
+        stopPlayback();
+        answer.textContent = '';
+        clearCitation();
+        btnAsk.disabled = false;
+        voiceText.textContent = '';
+        askInput.value = '';
+        lastInputFrom = 'voice';
+        voiceBusy = false;
+        Recorder.start(setVoiceStatus);
+    }
+    btnMic.onmousedown = startVoice;
+    btnMic.onmouseup = sendVoice;
+    btnMic.onmouseleave = function () { if (Recorder.isRecording()) sendVoice(); };
+
+    // 触屏：同理
+    btnMic.ontouchstart = function (e) { e.preventDefault(); startVoice(); };
+    btnMic.ontouchend = function (e) { e.preventDefault(); sendVoice(); };
+
+    function setVoiceStatus(msg) {
+        voiceStatus.textContent = msg;
+    }
+
+    function sendVoice() {
+        if (!Recorder.isRecording()) return;
+        var selectedASR = document.getElementById('asrProvider').value;
+        var myTask = recordingTask;
+        if (myTask !== taskSeq) { Recorder.cancel(); return; }
+        voiceBusy = true;
+
+        Recorder.stop()
+        .then(function (audioB64) {
+            if (myTask !== taskSeq) return null;
+            setVoiceStatus('正在识别…');
+            return postJSON('/api/asr', { audio: audioB64, format: 'wav', rate: 16000, provider: selectedASR }, 65000);
+        })
+        .then(function (data) {
+            if (myTask !== taskSeq) return;   // ★ 期间换药了 → 这次识别结果丢掉
+            voiceBusy = false;
+            if (data.ok) {
+                voiceText.textContent = data.text || '(没听清)';
+                if (data.text) lastInputFrom = 'voice';   // ★ 刚说的是新问题：这次以语音为准
+                if (!data.text) {
+                    // ★ 没听清时别只丢一行干巴巴的字：直接用乡音说"请你再讲一遍"（19 号录音）
+                    setVoiceStatus('没听清，用乡音提醒他再说一遍…');
+                    playVoiceFile('19_通用_没听清楚请再说一遍.mp3', voiceStatus);
+                } else {
+                    setVoiceStatus('识别完成 ✅');
+                }
+            } else {
+                voiceText.textContent = '';
+                setVoiceStatus('识别失败：' + data.error);
+            }
+        })
+        .catch(function (err) {
+            if (myTask !== taskSeq) return;
+            voiceBusy = false;
+            setVoiceStatus('出错了：' + (err && err.message ? err.message : err));
+        });
+    }
+
+    // ==================== 问药（问大模型）====================
+        var btnAsk = document.getElementById('btnAsk');
+    var askStatus = document.getElementById('askStatus');
+    var answer = document.getElementById('answer');
+    var citationBox = document.getElementById('citationBox');
+    var askInput = document.getElementById('askInput');
+    // ★ 记下"最近一次输入来自哪边"（2026-10-15 新增）：
+    //   老人先打字、后来又按住说了一句新的 —— 不该让那句旧打字偷偷盖过新问题。
+    askInput.addEventListener('input', function () { lastInputFrom = 'text'; });
+    var btnSpeak = document.getElementById('btnSpeak');
+    var btnSpeakPutong = document.getElementById('btnSpeakPutong');
+    var speakStatus = document.getElementById('speakStatus');
+    var player = document.getElementById('player');
+    var voicePlayer = document.getElementById('voicePlayer');   // ★ 乡音录音专用播放器（D21）
+    var lastQuestion = '';   // ★ 老人这次问的原话（D21：播不播乡音，要靠它判断问的是哪一类）
+    var lastInputFrom = 'text';   // ★ 最近一次输入来自哪边：'text' 打字 / 'voice' 语音（2026-10-15）
+    var currentVoicePlan = null;
+    var voiceFile = '';      // ★ 这次回答对应的乡音文件（'' = 没有乡音版，走普通话兜底）
+
+
+    // 设备精度与重复稳定不构成真实性证明。自动结果始终只作候选。
+    var regionCode = '', locationState = 'requesting', recognitionId = '';
+    var locationRun = 0, locationWatch = null, locationSelectionEpoch = 0;
+    var locationStop = null, locationConflict = false;
+    var regionCandidate = null, locationChoice = null, manualRegions = [], manualPanelRun = 0;
+    var savedLocationKey = 'xyd_county_choice_v2';
+    function locElement(id) { return document.getElementById(id); }
+    function forgetSavedCounty() {
+        try { localStorage.removeItem(savedLocationKey); } catch (ignore) {}
+        locElement('forgetLocation').hidden = true;
+    }
+    function stopAutomaticLocation() {
+        locationRun++;
+        if (locationStop) { var stop = locationStop; locationStop = null; stop(); }
+        locationRequests.slice().forEach(function (cancel) { cancel(); });
+        if (locationWatch !== null && navigator.geolocation) {
+            navigator.geolocation.clearWatch(locationWatch); locationWatch = null;
+        }
+    }
+    function showCountyChoice(choice, suffix) {
+        if (regionCode) return; // 已确认的县区不会被任何设备回调或记忆读取覆盖。
+        locationChoice = choice; locationState = 'pending_confirmation';
+        locElement('confirmLocation').hidden = false;
+        locElement('locationStatus').textContent =
+            (choice.kind === 'saved' ? '上次记住的县区：' : choice.quality === 'ordinary' ? '普通精度设备建议（可能不准）：' : '设备建议（可能不准）：') + choice.name +
+            '。请核对后点击“我在这里”；确认前不计入县区地图。' + (suffix || '');
+    }
+    function locationFallback(state, message) {
+        if (regionCode) return;
+        if (locationConflict) {
+            locElement('locationStatus').textContent += ' ' + message + '，请按实际所在地选择县区。'; return;
+        }
+        if (locationChoice) {
+            showCountyChoice(locationChoice, message + '。已保留此前候选，可核对后使用或另选县区。'); return;
+        }
+        regionCode = ''; locationState = state; locationChoice = null;
+        locElement('confirmLocation').hidden = true;
+        locElement('locationStatus').textContent = message + '。可选择实际县区，也可以直接拍照和问药。';
+    }
+    function beginLocation() {
+        stopAutomaticLocation();
+        var run = locationRun, finished = false, phase = 1, phaseClosed = false, pending = 0, timer = null;
+        var lastState = 'timeout', lastMessage = '高精度定位请求超时', firstFailure = '';
+        locationConflict = false;
+        if (!locationChoice) regionCandidate = null;
+        if (!regionCode && !locationChoice) locationState = 'requesting';
+        function current() { return !finished && run === locationRun; }
+        function clearWatch() {
+            if (locationWatch !== null && navigator.geolocation) { navigator.geolocation.clearWatch(locationWatch); locationWatch = null; }
+        }
+        function cleanup() { finished = true; clearTimeout(timer); clearWatch(); }
+        locationStop = cleanup;
+        function finish(state, message) {
+            if (!current()) return;
+            cleanup(); locationStop = null;
+            if (phase === 2 && firstFailure && message !== firstFailure) message += '；高精度阶段：' + firstFailure;
+            locationFallback(state, message);
+        }
+        function describe(error) {
+            if (error && error.code === 1) return ['denied', '您已拒绝浏览器或系统定位权限'];
+            if (error && error.code === 2) return ['unavailable', '浏览器的定位来源暂不可用'];
+            if (error && error.code === 3) return ['timeout', phase === 1 ? '高精度定位请求超时' : '普通精度定位重试超时'];
+            return ['unavailable', '浏览器没有提供可读取的位置'];
+        }
+        function progress(state, message) {
+            lastState = state; lastMessage = message;
+            if (!regionCode && !locationChoice && !locationConflict) {
+                locElement('locationStatus').textContent = message + '；可继续拍照和问药。';
+            }
+        }
+        function completePhase() {
+            if (!current() || !phaseClosed || pending) return;
+            if (regionCode || regionCandidate || locationConflict) { finish(lastState, lastMessage); return; }
+            if (phase === 1 && lastState !== 'denied') { startOrdinary(); return; }
+            finish(lastState, lastMessage);
+        }
+        function endPhase(state, message) {
+            if (!current() || phaseClosed) return;
+            lastState = state; lastMessage = message; phaseClosed = true; clearTimeout(timer); clearWatch();
+            completePhase(); // 先等已收到坐标的县区核对结束，不中途取消有效结果。
+        }
+        function applyCandidate(data, ordinary) {
+            if (!current() || regionCode) return;
+            var incoming = { code: data.city, name: data.name, kind: 'device', quality: ordinary ? 'ordinary' : 'high' };
+            if (locationChoice && locationChoice.kind === 'saved') {
+                regionCandidate = incoming;
+                showCountyChoice(locationChoice, incoming.code !== locationChoice.code ? '本次设备建议不同，不能自动覆盖上次县区。' : '请确认现在仍在这里。'); return;
+            }
+            if (regionCandidate && regionCandidate.code !== incoming.code) {
+                locationConflict = true; locationChoice = null; locationState = 'boundary_uncertain';
+                locElement('confirmLocation').hidden = true;
+                locElement('locationStatus').textContent = '设备先后建议：' + regionCandidate.name + '、' + incoming.name + '。结果存在冲突，请选择实际所在县区。'; return;
+            }
+            regionCandidate = incoming;
+            if (!locationConflict) showCountyChoice(incoming, ordinary ? '这是普通精度重试结果，请特别核对。' : '已收到一次有效结果，无需等待第二次。');
+        }
+        function received(position, expectedPhase) {
+            if (!current() || phaseClosed || phase !== expectedPhase) return;
+            var coords = position && position.coords, age = position ? Date.now() - position.timestamp : NaN;
+            if (!coords || !Number.isFinite(coords.longitude) || !Number.isFinite(coords.latitude) || !Number.isFinite(coords.accuracy) || coords.accuracy < 0) {
+                progress('unavailable', '设备返回的位置数据不完整'); return;
+            }
+            if (!Number.isFinite(age) || age > (phase === 2 ? 30000 : 15000) || age < -5000) {
+                progress('stale', '设备返回了过期位置，暂不能作为县区候选'); return;
+            }
+            if (coords.accuracy > 1000) {
+                progress('low_accuracy', '设备已返回位置，但估计范围约' + Math.ceil(coords.accuracy) + '米，暂不能确定县区'); return;
+            }
+            pending++;
+            postJSON('/api/region', { longitude: coords.longitude, latitude: coords.latitude, accuracy: coords.accuracy }, 5000, locationRequests).then(function (data) {
+                if (!current()) return;
+                if (data.ok && data.city) { applyCandidate(data, expectedPhase === 2); lastState = 'pending_confirmation'; lastMessage = '设备定位获取已结束'; }
+                else {
+                    var state = data.location_status || 'unavailable';
+                    progress(state, state === 'boundary_uncertain' ? '已收到位置，但误差可能跨越县界' : state === 'outside' ? '设备返回的位置不在广西统计范围' : '已收到位置，但暂未匹配到县区');
+                }
+            }).catch(function () {
+                if (current()) progress('unavailable', '已收到设备位置，但县区核对接口失败或超时');
+            }).then(function () { pending--; if (current()) completePhase(); });
+        }
+        function startOrdinary() {
+            firstFailure = lastMessage;
+            phase = 2; phaseClosed = false;
+            progress(lastState, lastMessage + '，正在尝试一次普通精度定位');
+            timer = setTimeout(function () { endPhase('timeout', '普通精度定位重试超时'); }, 11000);
+            try {
+                navigator.geolocation.getCurrentPosition(function (p) { received(p, 2); endPhase(lastState, lastMessage); }, function (e) {
+                    var info = describe(e); endPhase(info[0], info[1]);
+                }, { enableHighAccuracy: false, maximumAge: 30000, timeout: 10000 });
+            } catch (ignore) { endPhase('unavailable', '浏览器无法启动普通精度定位'); }
+        }
+        if (!navigator.geolocation || !window.isSecureContext) { finish('unavailable', '当前浏览器环境不支持安全定位，请使用可信HTTPS或本机地址'); return; }
+        if (!regionCode && !locationChoice) locElement('locationStatus').textContent = '正在获取设备建议；收到一次有效结果就展示，确认前不计入县区地图。';
+        timer = setTimeout(function () { endPhase('timeout', '高精度定位等待已结束'); }, 16000);
+        function highError(error) {
+            if (!current() || phase !== 1 || phaseClosed) return;
+            var info = describe(error); endPhase(info[0], info[1]);
+        }
+        try {
+            if (typeof navigator.geolocation.watchPosition === 'function') {
+                locationWatch = navigator.geolocation.watchPosition(function (p) { received(p, 1); }, highError, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+            } else navigator.geolocation.getCurrentPosition(function (p) { received(p, 1); endPhase(lastState, lastMessage); }, highError, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+        } catch (ignore) { endPhase('unavailable', '浏览器无法启动高精度定位'); }
+    }
+    function replaceOptions(select, prompt, rows, key, label) {
+        select.textContent = ''; var empty = document.createElement('option'); empty.value = ''; empty.textContent = prompt; select.appendChild(empty);
+        rows.forEach(function (row) { var item = document.createElement('option'); item.value = row[key]; item.textContent = row[label]; select.appendChild(item); });
+    }
+    function rememberCounty(code) {
+        if (!locElement('rememberLocation').checked) { forgetSavedCounty(); return; }
+        try { localStorage.setItem(savedLocationKey, JSON.stringify({ code: code, saved_at: Date.now() })); locElement('forgetLocation').hidden = false; }
+        catch (ignore) { locElement('manualLocationMessage').textContent = '浏览器不能记住县区，本次确认仍然有效。'; }
+    }
+    function useCounty(code, name, source) {
+        stopAutomaticLocation(); locationSelectionEpoch++; regionCode = code; locationState = source; locationChoice = null; regionCandidate = null; locationConflict = false;
+        rememberCounty(code); manualPanelRun++;
+        locElement('manualLocationPanel').hidden = true; locElement('confirmLocation').hidden = true;
+        locElement('locationStatus').textContent = (source === 'manual' ? '人工校准：' : '您已确认所在县区：') + name + '。不是GPS定位，换地方请重新选择。';
+        locElement('rejectLocation').textContent = '位置变了，重新选择县区';
+    }
+    locElement('confirmLocation').onclick = function () {
+        if (!locationChoice) return;
+        useCounty(locationChoice.code, locationChoice.name, locationChoice.kind === 'saved' ? 'manual' : 'confirmed');
+    };
+    locElement('retryLocation').onclick = function () { beginLocation(); };
+    locElement('rejectLocation').onclick = function () {
+        var prior = regionCode || (locationChoice && locationChoice.code) || '';
+        stopAutomaticLocation(); locationSelectionEpoch++; regionCode = ''; locationState = 'rejected_location'; locationChoice = null; regionCandidate = null; locationConflict = false;
+        locElement('confirmLocation').hidden = true; var seq = ++manualPanelRun;
+        locElement('locationStatus').textContent = '请选择实际所在县区，确认前不计入县区地图；问药照常可用。';
+        locElement('manualLocationPanel').hidden = false;
+        var city = locElement('manualCity'), county = locElement('manualCounty');
+        replaceOptions(city, '请选择市', [], 'prefix', 'name'); replaceOptions(county, '请先选市', [], 'code', 'name'); county.disabled = true;
+        locElement('applyManualLocation').disabled = true; locElement('manualLocationMessage').textContent = '正在读取县区名单…';
+        requestData('/api/regions', { method: 'GET' }, 5000, function (r) { return r.json(); }, countyRequests).then(function (data) {
+            if (seq !== manualPanelRun) return; if (!data.ok) throw new Error('县区名单读取失败'); manualRegions = data.cities;
+            replaceOptions(city, '请选择市', manualRegions, 'prefix', 'name');
+            var group = manualRegions.find(function (r) { return r.counties.some(function (x) { return x.code === prior; }); });
+            if (group) { city.value = group.prefix; city.onchange(); county.value = prior; county.onchange(); }
+            locElement('manualLocationMessage').textContent = '校准结果明确标为人工校准；不会把设备估计当作准确位置。';
+        }).catch(function () { if (seq === manualPanelRun) locElement('manualLocationMessage').textContent = '名单暂时读不到，请稍后重试；不影响问药。'; });
+    };
+    locElement('manualCity').onchange = function () {
+        var group = manualRegions.find(function (r) { return r.prefix === locElement('manualCity').value; });
+        replaceOptions(locElement('manualCounty'), group ? '请选择县／区' : '请先选市', group ? group.counties : [], 'code', 'name');
+        locElement('manualCounty').disabled = !group; locElement('applyManualLocation').disabled = true;
+    };
+    locElement('manualCounty').onchange = function () { locElement('applyManualLocation').disabled = !locElement('manualCounty').value; };
+    locElement('applyManualLocation').onclick = function () {
+        var group = manualRegions.find(function (r) { return r.prefix === locElement('manualCity').value; });
+        var county = group && group.counties.find(function (r) { return r.code === locElement('manualCounty').value; });
+        if (county) useCounty(county.code, group.name + county.name, 'manual');
+    };
+    function declineCounty() {
+        stopAutomaticLocation(); locationSelectionEpoch++; manualPanelRun++; regionCode = ''; locationState = 'rejected_location'; locationChoice = null; regionCandidate = null; locationConflict = false;
+        forgetSavedCounty(); locElement('confirmLocation').hidden = true; locElement('manualLocationPanel').hidden = true;
+        locElement('locationStatus').textContent = '本次不提供位置，后续问药不计入县区地图；拍照、提问和听乡音照常可用。';
+    }
+    locElement('cancelManualLocation').onclick = declineCounty;
+    locElement('skipLocation').onclick = declineCounty;
+    locElement('forgetLocation').onclick = declineCounty;
+    locElement('rememberLocation').onchange = function () { if (!this.checked) forgetSavedCounty(); };
+    function restoreSavedCounty() {
+        var item;
+        try { localStorage.removeItem('xyd_region'); item = JSON.parse(localStorage.getItem(savedLocationKey) || 'null'); } catch (ignore) { return; }
+        if (!item) return;
+        if (!/^45[0-9]{4}$/.test(item.code) || !Number.isFinite(item.saved_at) || Date.now() - item.saved_at > 30 * 86400000 || item.saved_at > Date.now() + 5000) { forgetSavedCounty(); return; }
+        var epoch = locationSelectionEpoch;
+        requestData('/api/regions', { method: 'GET' }, 5000, function (r) { return r.json(); }, countyRequests).then(function (data) {
+            if (epoch !== locationSelectionEpoch || regionCode || !data.ok) return;
+            var group = data.cities.find(function (r) { return r.counties.some(function (x) { return x.code === item.code; }); });
+            var county = group && group.counties.find(function (r) { return r.code === item.code; });
+            if (!county) { forgetSavedCounty(); return; }
+            locElement('forgetLocation').hidden = false;
+            showCountyChoice({ code: county.code, name: group.name + county.name, kind: 'saved' });
+        }).catch(function () { /* 无法校验记忆时不应用，不影响问药。 */ });
+    }
+    restoreSavedCounty();
+    beginLocation();
+
+
+
+
+    // ==================== ★ P1-7 答案出处（2026-10-16 新增）====================
+    // 目的：让"只依据说明书作答"这条红线**可以被当场核对**，而不是只能口头声明。
+    //   页面正文仍是大白话（老人看）；出处默认收起（小字折叠），点开才给家属/评委看。
+    //
+    // ★ 三条纪律：
+    //   ① 原文一律来自后端返回的真实说明书资料，前端**一个字都不生成** ——
+    //      自己"总结"出的出处等于没出处。
+    //   ② 定位不到就如实说"未定位到具体栏目"，**绝不显示一个猜的栏目**。
+    //   ③ 拒答时不出处（拒答句是程序固定生成的，本来就没有对应的说明书栏目）。
+    function escHtml(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function clearCitation() {
+        if (citationBox) citationBox.innerHTML = '';
+    }
+
+    function renderCitation(c) {
+        if (!citationBox) return;
+        // 拒答 / 认不出药 / 后端没给 → 不显示出处区，避免让人误以为"有依据"
+        if (!c) { clearCitation(); return; }
+
+        var rows = (c.引用栏目 || []).map(function (it) {
+            var cut = it.原文被截断 ? ' <span class="cite-note">（原文更长，已截取）</span>' : '';
+            return '<div class="cite-item">'
+                 + '<div class="cite-field">' + escHtml(it.栏目)
+                 + '<span class="cite-hint">' + escHtml(it.栏目说明 || '') + '</span></div>'
+                 + '<div class="cite-text">' + escHtml(it.原文) + cut + '</div>'
+                 + '</div>';
+        }).join('');
+
+        var miss = (c.未收录栏目 && c.未收录栏目.length)
+            ? '<div class="cite-note">说明书未收录的栏目：'
+              + escHtml(c.未收录栏目.join('、')) + '（这几项不能凭空回答）</div>' : '';
+
+        var body = rows
+            ? '<div class="cite-head">这条答案用了说明书的这几栏：</div>' + rows
+            : '<div class="cite-note">未定位到具体栏目 —— 这次回答没有可核对的原文依据，请以说明书为准。</div>';
+
+        citationBox.innerHTML =
+            '<button class="cite-toggle" id="citeToggle" type="button">'
+          + '看依据（出自说明书的哪几行）</button>'
+          + '<div class="cite-body" id="citeBody" hidden>'
+          + '<div class="cite-line">药品：' + escHtml(c.药品编号) + ' '
+          + escHtml(c.药名) + '</div>'
+          + (c.规格 ? '<div class="cite-line">规格：' + escHtml(c.规格) + '</div>' : '')
+          + body + miss
+          + (c.数据基准 ? '<div class="cite-line cite-src">数据基准：'
+                        + escHtml(c.数据基准) + '</div>' : '')
+          + '</div>';
+
+        var t = document.getElementById('citeToggle');
+        var b = document.getElementById('citeBody');
+        t.onclick = function () {
+            b.hidden = !b.hidden;
+            t.textContent = b.hidden ? '看依据（出自说明书的哪几行）' : '收起依据';
+        };
+    }
+
+    btnAsk.onclick = function () {
+        if (btnAsk.disabled) return;
+        if (ocrBusy) { askStatus.textContent = '药盒还在识别，请稍候'; return; }
+        if (voiceBusy || Recorder.isRecording()) { askStatus.textContent = '请先说完并等语音识别完成'; return; }
+        var typed = (askInput.value || '').trim();
+        var spoken = (voiceText.textContent || '').trim();
+        var question = (lastInputFrom === 'voice') ? (spoken || typed) : (typed || spoken);
+        if (!question) { askStatus.textContent = '请先按住说话，或在上面输入问题'; askInput.focus(); return; }
+        var myTask = newTask();
+        stopPlayback();
+        lastQuestion = question;
+        btnAsk.disabled = true;
+        answer.textContent = '';
+        clearCitation();
+        askStatus.textContent = '正在思考，请稍候…';
+        // 只发送本次成功识别的原文，不发送界面状态或上一盒药的文字。
+        if (ocrWords) question = '【药盒上识别到的文字】' + ocrWords + '\n\n【老人问的问题】' + question;
+        if (window.XYStepUI) window.XYStepUI.askStarted();
+        postJSON('/api/ask', { question: question, city: regionCode, location_status:locationState, recognition_id:recognitionId }, 100000)
+        .then(function (data) {
+            if (myTask !== taskSeq) return;
+            btnAsk.disabled = false;
+            if (!data.ok || typeof data.answer !== 'string') {
+                askStatus.textContent = '没有答成功，请再试一次';
+                if (window.XYStepUI) window.XYStepUI.answerFailed();
+                return;
+            }
+            answer.textContent = data.answer;
+            renderCitation(data.citation);
+            // answered 是唯一可使用正常录音的状态；缺状态也按拒答处理。
+            var refused = data.answer_status !== 'answered' || !!data.refuse_kind;
+            currentVoicePlan = !refused ? (data.voice || null) : null;
+            voiceFile = refused ? genericVoiceFile(data.refuse_kind || 'unknown') : findVoiceFile();
+            askStatus.textContent = refused ? '这条暂时不能自动讲解，请问医生或药师' : '回答完成';
+            btnSpeak.style.display = voiceFile ? 'block' : 'none';
+            btnSpeakPutong.style.display = 'block';
+            var partialIbuprofen = !refused && !voiceFile && data.citation
+                && data.citation.药名 === '布洛芬缓释胶囊'
+                && /什么人|哪些人|谁|禁忌/.test(lastQuestion)
+                && !/孕|怀孕|哺乳|喂奶/.test(lastQuestion);
+            if (partialIbuprofen) {
+                askStatus.textContent = '现有乡音只讲孕哺人群，完整禁忌使用普通话朗读';
+            }
+            autoSpeak();
+            if (window.XYStepUI) window.XYStepUI.answerReturned(data);
+        }).catch(function (error) {
+            if (myTask !== taskSeq) return;
+            btnAsk.disabled = false;
+            askStatus.textContent = '请求出错：' + error.message;
+            if (window.XYStepUI) window.XYStepUI.answerFailed();
+        });
+    };
+
+    // ==================== 乡音播报（D21 新增）====================
+    // 为什么这么绕：
+    //   桂柳话的"语音合成"目前没有可用的商用接口，这 20 句是**真人录的**，
+    //   句数和内容都是固定的，只能覆盖"确定的药 + 确定的问题类型"。
+    // ★ 匹配原则：宁可不播，也不能播错。
+    //   乡音老人听得更懂 —— 播错的危害比不播大得多。所以：
+    //   药名唯一 + 问题类型唯一，才播乡音；只要有一条不确定，就退回普通话。
+    var voiceTargetEl = null;   // 这段乡音播完后，提示写到哪个元素上
+
+    // 药盒上可能出现的写法 → 录音里用的药名
+    var DRUG_WORDS = [
+        ['感冒灵',   ['感冒灵']],
+        ['硝苯地平', ['硝苯地平']],
+        ['二甲双胍', ['二甲双胍']],
+        ['布洛芬',   ['布洛芬']],
+        ['奥美拉唑', ['奥美拉唑']]
+    ];
+
+    // 问题类型 → 老人平时的说法
+    // ★★★ 2026-10-16 拆开「注意」这一类 —— 原来把"副作用"和"什么人不能吃"
+    //   混成同一个 key '注意'，造成过**答非所问**：
+    //     问"布洛芬有什么副作用" → 播了 12 号「什么人不能吃」
+    //     问"硝苯地平什么人不能吃" → 播了 6 号「副作用」
+    //   两句在医学上完全不是一回事，播错方向是安全问题。
+    //   现在按说明书栏目拆开：一个 key 对应一个栏目，播错栏目的路直接堵死。
+    var TYPE_WORDS = {
+        '治什么': ['治什么', '治啥', '治哪', '什么病', '啥病', '有什么用', '有什么作用',
+                 '什么用', '干啥用', '管什么', '管啥', '适应症'],
+        '怎么吃': ['怎么吃', '咋吃', '怎样吃', '如何吃', '吃法', '吃多少', '多少次', '一天多少',
+                 '吃几粒', '吃几片', '吃几颗', '吃几次', '一天几', '一天吃', '一次吃', '几次',
+                 '几回', '一天几回', '用量', '剂量', '用法'],
+        // 副作用 =【不良反应】栏。录音 06 是硝苯地平的不良反应。
+        '副作用': ['副作用', '不良反应', '什么反应', '有害', '吃了会怎样', '吃了怎么样',
+                 '不舒服', '吃了有啥坏处', '会不会头晕', '会头晕', '会不会头痛', '会头痛', '会不会恶心'],
+        // 禁忌 =【禁忌】栏。录音 03/12 讲的都是"什么人不能吃"。
+        //   ★ 刻意**不含**"注意"两个字：老人说"要注意什么"时，指的可能是上面任何一栏，
+        //     拿不准就不播（见 pickType 的"认不出就不认"），宁可退回普通话。
+        '禁忌':   ['什么人不能吃', '哪些人不能吃', '什么人不', '哪些人不', '不能吃的人',
+                 '禁忌', '忌口', '禁用', '谁不能吃', '谁不宜', '不可以吃', '不宜吃'],
+        '吃几天': ['几天', '多久', '多少天', '吃多长', '长期'],
+        '老人':   ['老人', '老年', '年纪大']
+    };
+
+    // 录音清单：药名 + 问题类型 → 文件名
+    // （某个药没有某一类的录音就不写那一项 → 自然走普通话兜底）
+    var VOICE_MAP = {
+        '感冒灵':   { '治什么': '01_感冒灵_治什么.mp3',   '怎么吃': '02_感冒灵_怎么吃.mp3',   '禁忌': '03_感冒灵_什么人不能吃.mp3' },
+        '硝苯地平': { '治什么': '04_硝苯地平_治什么.mp3', '怎么吃': '05_硝苯地平_怎么吃.mp3', '副作用': '06_硝苯地平_副作用.mp3' },
+        '二甲双胍': { '治什么': '07_二甲双胍_治什么.mp3', '老人': '09_二甲双胍_老人能吃吗.mp3' },
+        '布洛芬':   { '治什么': '10_布洛芬_治什么.mp3',   '禁忌': '12_布洛芬_什么人不能吃.mp3' },
+        '奥美拉唑': { '治什么': '13_奥美拉唑_治什么.mp3' }
+    };
+
+    // ★★ 2026-10-16 停用清单 —— 与后端 01_资料/药品审核状态.json 的「播报禁用」一一对应。
+    //   为什么要两层都拦：后端已经拒答了，但**录音表里还留着这些文件**。
+    //   只要哪天审核状态改了、前端的表忘了同步，就又会播出去 ——
+    //   而"屏幕写着不讲剂量、声音在念剂量"恰恰是老人最信、也最会出事的那种错。
+    //   这里显式拉黑，让"改审核状态"这件事**必须同时改两处**，改漏了会立刻暴露。
+    var VOICE_DISABLED = {
+        '15_奥美拉唑_最多吃几天.mp3': '旧资料仍禁用；仅实物来源绑定可播放',
+        '11_布洛芬_怎么吃.mp3': '旧资料仍禁用；仅实物来源绑定可播放',
+        '05_硝苯地平_怎么吃.mp3': '旧普通片仍禁用；仅新Ⅱ型实物与补录来源绑定可播放',
+        '08_二甲双胍_吃多少.mp3': '旧0.85g资料仍禁用；仅0.25g新实物与补录来源绑定可播放',
+        '14_奥美拉唑_怎么吃.mp3':      '【规格】10毫克 与【用法用量】一次20mg 推不出（审核表 ⛔）',
+
+    };
+
+    // 每段录音"这句话到底讲了什么栏目"，用于播报前的一致性复核（见 factsConsistent）
+    var VOICE_FACTS = {
+        '01_感冒灵_治什么.mp3':   { field: '适应症',   must: ['感冒'],  forbid: ['剂量', '天'] },
+        '02_感冒灵_怎么吃.mp3':   { field: '用法用量', must: ['袋'],   forbid: ['癌'] },
+        '03_感冒灵_什么人不能吃.mp3': { field: '禁忌', must: ['肝', '肾'], forbid: ['癌'] },
+        '04_硝苯地平_治什么.mp3': { field: '适应症',   must: [], forbid: ['癌'] },
+        '05_硝苯地平_怎么吃.mp3': { field: '用法用量', must: [], forbid: ['癌'] },
+        '06_硝苯地平_副作用.mp3': { field: '不良反应', must: ['头晕'], forbid: ['不能吃', '禁用'] },
+        '07_二甲双胍_治什么.mp3': { field: '适应症',   must: ['糖尿病'], forbid: ['剂量'] },
+        '09_二甲双胍_老人能吃吗.mp3': { field: '特殊人群用药', must: [], any: ['70', '七十'], forbid: ['一天吃'] },
+        '10_布洛芬_治什么.mp3':   { field: '适应症',   must: ['痛'], forbid: ['癌'] },
+        '12_布洛芬_什么人不能吃.mp3': { field: '禁忌', must: ['孕'], forbid: ['癌'] },
+        '13_奥美拉唑_治什么.mp3': { field: '适应症',   must: ['胃'], forbid: ['天'] }
+    };
+
+    // 认出是哪个药：正好认出一个才作数（一个都没认出来、或认出两个，都不认）
+    function pickDrug(text) {
+        var hits = [];
+        for (var i = 0; i < DRUG_WORDS.length; i++) {
+            var words = DRUG_WORDS[i][1];
+            for (var j = 0; j < words.length; j++) {
+                if (text.indexOf(words[j]) >= 0) { hits.push(DRUG_WORDS[i][0]); break; }
+            }
+        }
+        return (hits.length === 1) ? hits[0] : '';
+    }
+
+    // 认出问的是哪一类：正好认出一类才作数（"老人能不能吃"同时像两类 → 不认）
+    function pickType(text) {
+        var hits = [];
+        for (var t in TYPE_WORDS) {
+            var words = TYPE_WORDS[t];
+            for (var i = 0; i < words.length; i++) {
+                if (text.indexOf(words[i]) >= 0) { hits.push(t); break; }
+            }
+        }
+        if (hits.length === 2 && hits.indexOf('老人') >= 0 && hits.indexOf('禁忌') >= 0) return '老人';
+        return (hits.length === 1) ? hits[0] : '';
+    }
+
+    // ★★ 2026-10-16 新增：这条录音和屏幕上的文字答案，说的是同一件事吗？
+    //   为什么要有：乡音是**预先录好的固定句子**，文字答案是模型这次现生成的。
+    //   两者只要有一处对不上，就出现"屏幕写 A、声音念 B"，而老人几乎只听声音。
+    //   这里做**最便宜的一致性检查**（不是语义理解，是几个硬锚点）：
+    //     · must 里的话，文字答案也得说到 —— 否则录音在替文字回答另一个问题；
+    //     · forbid 里的话，文字答案不能出现 —— 例如副作用录音里绝不能冒出"不能吃"。
+    //   查不过就退回普通话念文字答案（保守，且信息不少）。
+    var VOICE_TRANSCRIPTS = {
+  "01_感冒灵_治什么.mp3": "感冒灵颗粒是治感冒的。头痛、发烧、鼻塞、流鼻涕、喉咙痛，都可以吃。",
+  "04_硝苯地平_治什么.mp3": "硝苯地平片是治心口疼和高血压的。",
+  "06_硝苯地平_副作用.mp3": "吃了可能会头晕、头痛、恶心、脸发红，要慢慢来，别急。",
+  "10_布洛芬_治什么.mp3": "布洛芬是止痛退烧的。头痛、牙痛、关节痛、痛经，都可以吃。",
+  "12_布洛芬_什么人不能吃.mp3": "怀孕的人和喂奶的人不能吃。",
+  "02_感冒灵_怎么吃.mp3": "一次冲一袋，一天吃三回，要用开水冲。",
+  "11_布洛芬_怎么吃.mp3": "一次吃一粒，一天两回，早上一次晚上一次。要整粒吞，不要嚼。",
+  "15_奥美拉唑_最多吃几天.mp3": "最多只能吃七天。七天还不好，就要去看医生了。",
+  "03_感冒灵_什么人不能吃.mp3": "严重肝肾功能不全的人不能吃。拿不准自己的情况，先问医生。",
+  "13_奥美拉唑_治什么.mp3": "这盒药用于胃酸过多引起的烧心和反酸症状的短期缓解。",
+  "14_奥美拉唑_怎么吃.mp3": "成人一次一粒，一天一次，每二十四小时一次，用开水送服。必须整粒吞服，不能嚼。",
+  "05_硝苯地平_怎么吃.mp3": "成人每次二十毫克，一天两次。要整片吞服，不要嚼碎。具体按医生交代，不要自己调整。",
+  "08_二甲双胍_吃多少.mp3": "成人开始一次一片，一天两到三次，吃饭的时候吃。按医生交代，不要自行加量。",
+  "09_二甲双胍_老人能吃吗.mp3": "七十岁以上的老人要慎用，可能会出现乳酸性酸中毒。能不能吃，请问医生，不要自己判断。",
+  "07_二甲双胍_治什么.mp3": "盐酸二甲双胍片用于单靠控制饮食，血糖还控制不好的二型糖尿病患者。能不能用，要问医生。"
+};
+
+    function normalizeVoiceText(text) {
+        return (text || '').replace(/^\s*(?:\[答\]|【答】|［答］)/, '')
+            .replace(/八十/g, '80').replace(/[\s，。！？、；：,.!?;:（）()“”"']/g, '');
+    }
+
+    function factsConsistent(name, answerText) {
+        // 只接受完整台词一致；几个关键词出现不再代表录音与答案一致。
+        if ((VOICE_DISABLED[name] && !(currentVoicePlan && currentVoicePlan.file === name && currentVoicePlan.binding === 'source-and-audio-v1')) || !VOICE_TRANSCRIPTS[name]) return false;
+        if (normalizeVoiceText(VOICE_TRANSCRIPTS[name]) === normalizeVoiceText(answerText)) return true;
+        return !!(currentVoicePlan && currentVoicePlan.binding === 'source-and-audio-v1'
+            && currentVoicePlan.file === name && currentVoicePlan.answer_text === answerText
+            && normalizeVoiceText(currentVoicePlan.text) === normalizeVoiceText(VOICE_TRANSCRIPTS[name]));
+    }
+
+    // 找这一问对应的乡音录音；找不到就返回 ''（交给普通话兜底）
+    function findVoiceFile() {
+        if (currentVoicePlan && currentVoicePlan.drug && currentVoicePlan.binding === 'source-and-audio-v1'
+            && pickDrug(ocrWords || result.textContent || '') === pickDrug(currentVoicePlan.drug)
+            && factsConsistent(currentVoicePlan.file, answer.textContent)) return currentVoicePlan.file;
+        var drug = pickDrug(ocrWords || result.textContent || '');   // 药名：从"拍照识别的文字"里找
+        if (!drug) return '';
+        var type = pickType(lastQuestion || '');         // 类型：从"老人问的原话"里找
+        if (!type) return '';
+        var row = VOICE_MAP[drug];
+        if (!row) return '';
+        var name = row[type] || '';
+        if (!name || !currentVoicePlan || currentVoicePlan.file !== name) return '';
+
+        // ★ 停用清单兜底（后端已拒答，这里再挡一道）
+        if (VOICE_DISABLED[name]) {
+            console.warn('[乡音] ' + name + ' 已在停用清单（' + VOICE_DISABLED[name] + '）→ 不播');
+            return '';
+        }
+        // ★ 与屏幕文字对不上就不播（宁可退回普通话，也不要"屏幕 A、声音 B"）
+        if (!factsConsistent(name, answer.textContent)) return '';
+        return name;
+    }
+
+    // ==================== ★★ 拒答时能播的乡音（2026-10-15 新增）====================
+    // 为什么必须单独一张表：
+    //   VOICE_MAP 里全是"某个药 + 某类问题"的**正常用法**录音，拒答时一条都不许用 ——
+    //   曾经出过的事故：屏幕上写着"不能告诉您"，声音里却在念普通片的吃法。
+    // 这三句是**通用安全话术**，不含任何药名和剂量，老人听错也不会照着吃药：
+    //   · mismatch 药盒上的剂型和资料对不上 → 20 号「我是机器，不是医生，拿不准的要问医生」
+    //   · audit    资料审核未通过（审核表登记的冲突字段）→ 18 号「是药不能乱吃，说明书说多少就多少」
+    //   · unknown  模型既没标[答]也没说拒答话 → 20 号（拿不准就退到"我不是医生"）
+    //   · notfound 没认出这是什么药        → 16 号「没认出来，请把药名那一面再拍一次」
+    //   · scope    资料里没有这条信息      → 17 号「资料里没有写，我不能乱讲，去问医生/药师」
+    var GENERIC_VOICE = {
+        'mismatch': '20_通用_我是机器不是医生.mp3',
+        'audit':    '18_通用_是药不能乱吃.mp3',
+        'unknown':  '20_通用_我是机器不是医生.mp3',
+        'notfound': '16_通用_没认出来请重新拍.mp3',
+        'scope':    '17_通用_资料没有我不乱讲.mp3',
+        'safety':   '20_通用_我是机器不是医生.mp3',
+        'identity': ''
+    };
+
+    // 拒答时按类别取通用乡音；取不到就返回 ''（退回普通话 TTS 念后台原文，仍是安全的）
+    function genericVoiceFile(kind) {
+        return GENERIC_VOICE[kind] || '';
+    }
+
+    // 手机端：分段音频优先；无进度时仅重试一次完整下载，不把等待当成正在播。
+    function cancelVoiceAttempt() {
+        if (!activeVoice) return;
+        if (activeVoice.timer) clearTimeout(activeVoice.timer);
+        if (activeVoice.blobUrl) URL.revokeObjectURL(activeVoice.blobUrl);
+        activeVoice.timer = 0;
+        activeVoice.blobUrl = '';
+    }
+
+    function playVoiceFile(name, statusEl) {
+        if (!name || (VOICE_DISABLED[name] && !(currentVoicePlan && currentVoicePlan.file === name && currentVoicePlan.binding === 'source-and-audio-v1'))) return;
+        var isGeneric = Object.keys(GENERIC_VOICE).some(function (key) { return GENERIC_VOICE[key] === name; }) || name === '19_通用_没听清楚请再说一遍.mp3';
+        if (!isGeneric && (!currentVoicePlan || currentVoicePlan.file !== name || !factsConsistent(name, answer.textContent))) return;
+        cancelVoiceAttempt();
+        speakToken = speakToken + 1;
+        var attempt = { task: taskSeq, token: speakToken, failed: false, timer: 0,
+                        blobTried: false, blobUrl: '', lastTime: 0, stalls: 0,
+                        target: statusEl || speakStatus, answerPlayback: !statusEl || statusEl === speakStatus };
+        activeVoice = attempt;
+        player.pause();
+        voicePlayer.pause();
+        voicePlayer.muted = false;
+        voicePlayer.volume = 1;
+        var url = 'audio/' + encodeURIComponent(name) + '?v=20261024-ui1';
+        function current() { return activeVoice === attempt && attempt.task === taskSeq && attempt.token === speakToken; }
+        function fail(error) {
+            if (!current() || attempt.failed) return;
+            attempt.failed = true;
+            cancelVoiceAttempt();
+            voicePlayer.pause();
+            if (error && error.name === 'NotAllowedError') {
+                attempt.target.textContent = '请点「听乡音」或「听普通话」播放';
+                return;
+            }
+            attempt.target.textContent = '乡音没有放成功';
+            if (attempt.answerPlayback && answer.textContent) {
+                voiceFile = '';
+                btnSpeak.style.display = 'none';
+                btnSpeakPutong.style.display = 'block';
+                speakAnswer();
+            }
+        }
+        function arm() {
+            if (!current() || attempt.failed) return;
+            attempt.timer = setTimeout(function () {
+                if (!current() || attempt.failed) return;
+                var time = Number(voicePlayer.currentTime) || 0;
+                if (!voicePlayer.paused && time > attempt.lastTime + 0.02) {
+                    attempt.stalls = 0;
+                    attempt.target.textContent = '正在用乡音念…';
+                } else {
+                    attempt.stalls++;
+                }
+                attempt.lastTime = time;
+                if (attempt.stalls >= 3) {
+                    if (attempt.blobTried) { fail(new Error('audio stalled')); return; }
+                    attempt.blobTried = true;
+                    attempt.target.textContent = '乡音加载较慢，正在重新准备…';
+                    voicePlayer.pause();
+                    requestData(url, { cache: 'no-store' }, 15000, function (response) { return response.blob(); })
+                    .then(function (blob) {
+                        if (!current() || attempt.failed) return;
+                        if (blob.size < 1000) throw new Error('audio incomplete');
+                        attempt.blobUrl = URL.createObjectURL(blob);
+                        attempt.stalls = 0; attempt.lastTime = 0;
+                        loadAndPlay(attempt.blobUrl);
+                    }).catch(fail);
+                    return;
+                }
+                arm();
+            }, 2500);
+        }
+        function loadAndPlay(src) {
+            if (!current() || attempt.failed) return;
+            voicePlayer.src = src;
+            voicePlayer.load();
+            attempt.target.textContent = '正在准备乡音…';
+            var playing;
+            try { playing = voicePlayer.play(); } catch (error) { fail(error); return; }
+            if (playing && playing.catch) playing.catch(fail);
+            arm();
+        }
+        voicePlayer.onplaying = function () {
+            if (current() && !attempt.failed) attempt.target.textContent = '正在用乡音念…';
+        };
+        voicePlayer.onwaiting = voicePlayer.onstalled = function () {
+            if (current() && !attempt.failed) attempt.target.textContent = '乡音正在缓冲，请稍候…';
+        };
+        voicePlayer.onended = function () {
+            if (!current() || attempt.failed) return;
+            cancelVoiceAttempt();
+            attempt.target.textContent = '乡音念完了';
+            activeVoice = null;
+        };
+        voicePlayer.onerror = fail;
+        loadAndPlay(url);
+    }
+
+    function autoSpeak() {
+        if (voiceFile) playVoiceFile(voiceFile);
+        else speakAnswer();
+    }
+
+    var speakToken = 0;
+    var lastAudioUrl = '';
+    var lastAudioText = '';
+
+    function speakAnswer() {
+        var text = (answer.textContent || '').trim();
+        if (!text) { speakStatus.textContent = '还没有回答可以念'; return; }
+        speakToken = speakToken + 1;
+        var myToken = speakToken;
+        var myTask = taskSeq;
+        cancelVoiceAttempt();
+        activeVoice = null;
+        player.pause();
+        voicePlayer.pause();
+        function current() { return myTask === taskSeq && myToken === speakToken; }
+        function play() {
+            if (!current()) return;
+            player.onended = function () { if (current()) speakStatus.textContent = '念完了'; };
+            player.onerror = function () { if (current()) speakStatus.textContent = '没有放成功，请点「听普通话」重试'; };
+            player.src = lastAudioUrl;
+            player.currentTime = 0;
+            speakStatus.textContent = '正在念…';
+            var playing = player.play();
+            if (playing && playing.catch) playing.catch(function () {
+                if (current()) speakStatus.textContent = '请点「听普通话」播放';
+            });
+        }
+        if (text === lastAudioText && lastAudioUrl) { play(); return; }
+        speakStatus.textContent = '正在准备声音…';
+        requestData('/api/tts', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: text })
+        }, 65000, function (response) { return response.blob(); })
+        .then(function (blob) {
+            if (!current()) return; // 音频回来时已经换药了或切换了播放方式，直接丢弃。
+            if (blob.size < 1000) throw new Error('声音没有准备成功');
+            if (lastAudioUrl) URL.revokeObjectURL(lastAudioUrl);
+            lastAudioUrl = URL.createObjectURL(blob);
+            lastAudioText = text;
+            play();
+        }).catch(function (error) {
+            if (current()) speakStatus.textContent = '播报出错，请点「听普通话」重试';
+        });
+    }
+
+    btnSpeak.onclick = function () { if (voiceFile) playVoiceFile(voiceFile); };
+    btnSpeakPutong.onclick = speakAnswer;
+
+    // ---------- PWA：注册 Service Worker ----------
+    // 作用：满足"添加到主屏幕"的安装条件，让老人桌面出现独立图标。
+    // 失败也没关系——网页功能一切照旧，只是可能没有独立图标。
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(function () { /* 忽略 */ });
+    }
+
+</script>
+<script src="ui_presentation.js?v=20261028-step1"></script>
+</body>
+</html>

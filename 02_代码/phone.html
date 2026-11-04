@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>乡音药箱 · 演示</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230B3A28'/%3E%3Crect x='14' y='28' width='36' height='9' rx='4.5' fill='%23E7CE93'/%3E%3Crect x='27.5' y='14.5' width='9' height='36' rx='4.5' fill='%23E7CE93'/%3E%3C/svg%3E">
+<style>
+/* ==================================================================
+   乡音药箱 · 电脑虚拟手机演示外壳（phone.html）
+   ------------------------------------------------------------------
+   作用：在电脑上开一个「手机形状」的窗口，里面跑真实的应用页面，
+        并且 ① 能用麦克风录音 ② 能外放声音 ③ 能调音量。
+   原理：本页由 server.py 从同一个地址提供（http://127.0.0.1:8000/phone.html），
+        中间用 iframe 载入 /index.html —— 同源，所以能直接操作
+        iframe 里的 <audio> 元素（改 volume）和麦克风权限。
+   ★ 不改 index.html 任何一行。
+   ================================================================== */
+
+html, body { height: 100%; }
+
+body {
+    margin: 0;
+    padding: 14px 16px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 26px;
+    overflow: auto;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    color: #E9EFF5;
+    background-color: #0B0F14;
+    background-image:
+        radial-gradient(1100px 620px at 12% -6%, rgba(30, 110, 78, 0.34) 0%, rgba(0, 0, 0, 0) 62%),
+        radial-gradient(820px 560px at 104% 104%, rgba(200, 160, 90, 0.20) 0%, rgba(0, 0, 0, 0) 58%),
+        linear-gradient(163deg, #0A0E13 0%, #121A22 52%, #0A0E12 100%);
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ==================== 手机 ==================== */
+
+.stage {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.phone {
+    /* 机身（含边框）：屏幕 390 × 844 + 两边各 12px 边框 */
+    position: relative;
+    box-sizing: border-box;
+    width: 414px;
+    height: 868px;
+    padding: 12px;
+    border-radius: 56px;
+    background:
+        linear-gradient(148deg,
+            #8B9099 0%, #3A4048 14%, #14181D 42%,
+            #1E232A 62%, #575E67 86%, #9BA1A9 100%);
+    box-shadow:
+        0 42px 84px rgba(0, 0, 0, 0.66),
+        0 8px 22px rgba(0, 0, 0, 0.5),
+        inset 0 0 0 2px rgba(255, 255, 255, 0.10),
+        inset 0 1px 0 rgba(255, 255, 255, 0.30);
+}
+
+/* 机身侧键（装饰） */
+.phone::before,
+.phone::after {
+    content: "";
+    position: absolute;
+    width: 3px;
+    border-radius: 3px;
+    background: linear-gradient(180deg, #6E757E, #2A2F35 50%, #6E757E);
+}
+.phone::before { left: -3px; top: 176px; height: 62px; box-shadow: 0 78px 0 #4A5058; }
+.phone::after  { right: -3px; top: 208px; height: 96px; }
+
+/* 屏幕 */
+.screen {
+    position: relative;
+    width: 390px;
+    height: 844px;
+    border-radius: 45px;
+    overflow: hidden;
+    background: #F7F5EF;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.65);
+}
+
+#app {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: #F7F5EF;
+}
+
+/* 灵动岛 */
+.island {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 108px;
+    height: 30px;
+    border-radius: 16px;
+    background: #05070A;
+    z-index: 6;
+    pointer-events: none;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+.island::after {                    /* 前摄镜头 */
+    content: "";
+    position: absolute;
+    right: 11px;
+    top: 50%;
+    width: 8px;
+    height: 8px;
+    margin-top: -4px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 32% 30%, #2C3A4C, #070B11 72%);
+    box-shadow: inset 0 0 2px rgba(90, 140, 200, 0.55);
+}
+
+/* 状态栏（叠在应用顶栏的墨绿渐变上 → 用浅金色，天然协调） */
+.sbar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 44px;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 26px;
+    pointer-events: none;
+    font-size: 13.5px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    color: #F3E9CE;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+.sbar .right { display: flex; align-items: center; gap: 6px; }
+.sbar svg { display: block; }
+
+/* Home 指示条 */
+.homebar {
+    position: absolute;
+    bottom: 7px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 132px;
+    height: 5px;
+    border-radius: 3px;
+    background: rgba(11, 58, 40, 0.5);
+    z-index: 5;
+    pointer-events: none;
+}
+
+/* ==================== 控制台 ==================== */
+
+.panel {
+    flex: 0 0 292px;
+    width: 292px;
+    max-height: 900px;
+    overflow: auto;
+    padding: 18px 20px 20px 20px;
+    box-sizing: border-box;
+    border-radius: 24px;
+    background: linear-gradient(168deg, rgba(28, 38, 48, 0.92) 0%, rgba(14, 20, 26, 0.94) 100%);
+    border: 1px solid rgba(200, 160, 90, 0.28);
+    box-shadow: 0 26px 56px rgba(0, 0, 0, 0.5);
+}
+
+.brand { display: flex; align-items: center; gap: 9px; }
+.brand .dot {
+    width: 11px; height: 11px; border-radius: 50%;
+    background: #3FD08A;
+    box-shadow: 0 0 0 4px rgba(63, 208, 138, 0.18);
+}
+.brand h2 { margin: 0; font-size: 18px; letter-spacing: 1px; color: #F3E9CE; }
+.panel .sub {
+    margin: 7px 0 16px 0;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: #8FA0AE;
+}
+
+.card {
+    margin-bottom: 13px;
+    padding: 13px 14px 14px 14px;
+    border-radius: 15px;
+    background: rgba(255, 255, 255, 0.055);
+    border: 1px solid rgba(255, 255, 255, 0.075);
+}
+.card h3 {
+    margin: 0 0 10px 0;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1.4px;
+    color: #C8A05A;
+}
+
+/* 音量数字 */
+.volrow { display: flex; align-items: baseline; gap: 3px; margin-bottom: 7px; }
+#volNum { font-size: 34px; font-weight: 700; color: #FFFFFF; line-height: 1; }
+.volrow .unit { font-size: 14px; color: #7E8FA0; }
+
+input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 8px;
+    margin: 4px 0 12px 0;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #C8A05A 0%, #E7CE93 var(--p, 100%), #2A3540 var(--p, 100%), #2A3540 100%);
+    outline: none;
+    cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 34% 30%, #FFFFFF, #C8A05A 78%);
+    border: 2px solid #FFF6E0;
+    box-shadow: 0 3px 9px rgba(0, 0, 0, 0.55);
+}
+
+.chips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.chips button { min-width: 0; }
+button {
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #DCE6EF;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.07);
+    cursor: pointer;
+    transition: background 0.12s, transform 0.06s;
+}
+button:hover { background: rgba(255, 255, 255, 0.14); }
+button:active { transform: translateY(1px); }
+button.mute.on {
+    color: #12171C;
+    background: #E7CE93;
+    border-color: #E7CE93;
+}
+button.wide { display: block; width: 100%; margin-top: 7px; text-align: left; padding: 9px 12px; }
+button.ghost {
+    color: #CFE0EE;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(120, 175, 220, 0.28);
+}
+button.ghost:hover { background: rgba(120, 175, 220, 0.14); }
+
+.pill {
+    display: inline-block;
+    padding: 4px 11px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #9FB0BE;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.pill.ok   { color: #0E2C1C; background: #3FD08A; border-color: #3FD08A; }
+.pill.bad  { color: #FFE7E7; background: rgba(210, 66, 66, 0.5); border-color: rgba(255, 120, 120, 0.6); }
+
+.mic-state { margin-bottom: 9px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tip {
+    margin: 9px 0 0 0;
+    font-size: 11.5px;
+    line-height: 1.65;
+    color: #8A9AA8;
+}
+.tip b { color: #C8A05A; }
+
+.hint {
+    margin: 22px 0 0 0;
+    font-size: 12px;
+    line-height: 1.7;
+    color: #7A8B99;
+    text-align: center;
+}
+.hint kbd {
+    font-family: inherit;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #DCE6EF;
+}
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="phone">
+    <div class="screen">
+      <div class="island"></div>
+
+      <div class="sbar">
+        <span id="clock">--:--</span>
+        <span class="right">
+          <!-- 信号 -->
+          <svg width="17" height="12" viewBox="0 0 17 12" aria-hidden="true">
+            <rect x="0"  y="8"   width="3" height="4"  rx="1" fill="#F3E9CE"/>
+            <rect x="4.5" y="6"  width="3" height="6"  rx="1" fill="#F3E9CE"/>
+            <rect x="9"  y="3.5" width="3" height="8.5" rx="1" fill="#F3E9CE"/>
+            <rect x="13.5" y="1" width="3" height="11" rx="1" fill="#F3E9CE"/>
+          </svg>
+          <!-- WiFi -->
+          <svg width="16" height="12" viewBox="0 0 16 12" aria-hidden="true">
+            <path d="M8 10.4l2.6-3.2a4.2 4.2 0 0 0-5.2 0L8 10.4z" fill="#F3E9CE"/>
+            <path d="M3.1 4.9a7.6 7.6 0 0 1 9.8 0" stroke="#F3E9CE" stroke-width="1.7" fill="none" stroke-linecap="round"/>
+            <path d="M1.2 2.4a10.6 10.6 0 0 1 13.6 0" stroke="#F3E9CE" stroke-width="1.7" fill="none" stroke-linecap="round" opacity=".75"/>
+          </svg>
+          <!-- 电池 -->
+          <svg width="26" height="12" viewBox="0 0 26 12" aria-hidden="true">
+            <rect x="0.7" y="0.7" width="21" height="10.6" rx="3.2" fill="none" stroke="#F3E9CE" stroke-width="1.3" opacity=".55"/>
+            <rect id="battFill" x="2.6" y="2.6" width="17" height="6.8" rx="1.9" fill="#F3E9CE"/>
+            <path d="M23.4 4.3v3.4a2 2 0 0 0 0-3.4z" fill="#F3E9CE" opacity=".55"/>
+          </svg>
+        </span>
+      </div>
+
+      <iframe id="app" src="/index.html"
+              allow="geolocation 'self'; microphone *; autoplay *; fullscreen *; clipboard-write *"
+              allowfullscreen></iframe>
+
+      <div class="homebar"></div>
+    </div>
+  </div>
+</div>
+
+<aside class="panel">
+  <div class="brand"><span class="dot"></span><h2>演示控制台</h2></div>
+  <p class="sub">电脑上的虚拟手机 · 麦克风与扬声器都是真的<br>（里面的应用就是比赛要演示的那一个）</p>
+
+  <section class="card">
+    <h3>扬声器音量</h3>
+    <div class="volrow"><span id="volNum">100</span><span class="unit">%</span></div>
+    <input id="vol" type="range" min="0" max="100" value="100">
+    <div class="chips">
+      <button data-v="25">25%</button>
+      <button data-v="50">50%</button>
+      <button data-v="75">75%</button>
+      <button data-v="100">100%</button>
+      <button id="mute" class="mute">静音</button>
+    </div>
+    <button id="testVoice" class="wide ghost" style="margin-top:9px;">▶ 试听一段乡音（验证扬声器）</button>
+    <p class="tip">这是<b>应用内音量</b>。要让整台电脑更响/更轻，用 Windows 右下角的喇叭，或在<b>音量合成器</b>里单独调 Chrome。</p>
+  </section>
+
+  <section class="card">
+    <h3>麦克风</h3>
+    <div class="mic-state">
+      <span class="pill" id="micPill">未检测</span>
+      <span class="tip" style="margin:0;">点右边先授权</span>
+    </div>
+    <button id="micCheck" class="wide ghost">检测并授权麦克风</button>
+    <p class="tip">先点这里授权一次，之后在虚拟手机里按「<b>按住说话</b>」就<b>不会再弹窗</b>，录到的声音会发给服务端识别。</p>
+  </section>
+
+  <section class="card">
+    <h3>操作</h3>
+    <button id="reload" class="wide ghost">重新加载应用</button>
+    <button id="open"   class="wide ghost">在普通浏览器窗口里打开</button>
+  </section>
+
+  <p class="hint">按 <kbd>F11</kbd> 全屏；按住 <kbd>Ctrl</kbd> 滚动滚轮可缩放<br>关掉这个窗口只是收起演示，服务仍在后台运行</p>
+</aside>
+
+<script>
+(function () {
+    'use strict';
+
+    var frame   = document.getElementById('app');
+    var vol     = document.getElementById('vol');
+    var volNum  = document.getElementById('volNum');
+    var muteBtn = document.getElementById('mute');
+    var pill    = document.getElementById('micPill');
+
+    var MASTER = 1;          // 应用内音量系数 0~1
+    var lastVol = 1;         // 静音前的音量（用于取消静音）
+    var muted = false;
+
+    /* ---------- 工具：拿到 iframe 里的 document（同源，直接可用） ---------- */
+    function innerDoc() {
+        try { return frame.contentDocument; } catch (e) { return null; }
+    }
+
+    /* ---------- 音量：把系数应用到应用里所有的 <audio> / <video> ---------- */
+    function applyVolume() {
+        var d = innerDoc();
+        if (!d) return 0;
+        var list = d.querySelectorAll('audio, video');
+        for (var i = 0; i < list.length; i++) {
+            try { list[i].volume = MASTER; } catch (e) { /* 忽略 */ }
+        }
+        return list.length;
+    }
+
+    function setVolume(v, quiet) {
+        MASTER = Math.max(0, Math.min(1, v));
+        volNum.textContent = Math.round(MASTER * 100);
+        vol.value = Math.round(MASTER * 100);
+        vol.style.setProperty('--p', (MASTER * 100) + '%');
+        muted = (MASTER === 0);
+        muteBtn.classList.toggle('on', muted);
+        muteBtn.textContent = muted ? '已静音' : '静音';
+        applyVolume();
+        if (!quiet) statusFlash('音量 ' + Math.round(MASTER * 100) + '%');
+    }
+
+    vol.addEventListener('input', function () { setVolume(this.value / 100, true); });
+
+    muteBtn.addEventListener('click', function () {
+        if (muted) { setVolume(lastVol || 1); }
+        else       { lastVol = MASTER || 1; setVolume(0); }
+    });
+
+    Array.prototype.forEach.call(document.querySelectorAll('.chips button[data-v]'), function (b) {
+        b.addEventListener('click', function () { setVolume(parseInt(b.getAttribute('data-v'), 10) / 100); });
+    });
+
+    /* ---------- 应用加载完成后，把音量接上去 ---------- */
+    frame.addEventListener('load', function () {
+        // 应用里可能在 load 之后才创建音频元素，隔几拍都补一次
+        [80, 400, 1200].forEach(function (ms) { setTimeout(applyVolume, ms); });
+        setStatus('就绪');
+    });
+
+    /* ---------- 试听：直接驱动应用里的乡音播放器 ---------- */
+    document.getElementById('testVoice').addEventListener('click', function () {
+        var d = innerDoc();
+        if (!d) { statusFlash('应用还没加载好'); return; }
+        var el = d.getElementById('voicePlayer');
+        if (!el) { statusFlash('没找到播放器'); return; }
+        try {
+            el.pause();
+            el.volume = MASTER;
+            el.currentTime = 0;
+            el.src = '/audio/' + encodeURIComponent('01_感冒灵_治什么.mp3');
+            var p = el.play();
+            if (p && p.catch) { p.catch(function (e) { statusFlash('播放被拦：' + e.name); }); }
+            else { statusFlash('正在试听…'); }
+        } catch (e) { statusFlash('播放出错：' + e.message); }
+    });
+
+    /* ---------- 麦克风：先在本页授权一次（同源，应用里就免弹窗） ---------- */
+    document.getElementById('micCheck').addEventListener('click', function () {
+        pill.className = 'pill';
+        pill.textContent = '检测中…';
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            pill.className = 'pill bad';
+            pill.textContent = '此浏览器不支持';
+            return;
+        }
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+            stream.getTracks().forEach(function (t) { t.stop(); });   // 只测权限，立刻释放
+            pill.className = 'pill ok';
+            pill.textContent = '已允许';
+            statusFlash('麦克风可用');
+        }).catch(function (err) {
+            pill.className = 'pill bad';
+            pill.textContent = (err && err.name === 'NotAllowedError') ? '被拒绝' : '不可用';
+            statusFlash('麦克风：' + (err && err.name ? err.name : '失败'));
+        });
+    });
+
+    /* ---------- 操作 ---------- */
+    document.getElementById('reload').addEventListener('click', function () {
+        frame.src = '/index.html?t=' + Date.now();
+    });
+    document.getElementById('open').addEventListener('click', function () {
+        window.open('/index.html', '_blank');
+    });
+
+    /* ---------- 状态栏：时钟 + 电池 ---------- */
+    function tickClock() {
+        var d = new Date();
+        var hh = d.getHours(), mm = d.getMinutes();
+        document.getElementById('clock').textContent =
+            (hh < 10 ? '0' : '') + hh + ':' + (mm < 10 ? '0' : '') + mm;
+    }
+    tickClock();
+    setInterval(tickClock, 15000);
+
+    if (navigator.getBattery) {
+        navigator.getBattery().then(function (b) {
+            var fill = document.getElementById('battFill');
+            function upd() { fill.setAttribute('width', Math.max(3, Math.round(17 * b.level))); }
+            upd();
+            b.addEventListener('levelchange', upd);
+        }).catch(function () {});
+    }
+
+    /* ---------- 右下角一闪而过的状态提示（用页面标题代替，不占版面） ---------- */
+    var statusTimer = null;
+    function setStatus(t) { document.title = '乡音药箱 · ' + t; }
+    function statusFlash(t) {
+        setStatus(t);
+        clearTimeout(statusTimer);
+        statusTimer = setTimeout(function () { setStatus('演示'); }, 2200);
+    }
+
+    setVolume(1, true);      // 初始 100%
+    setStatus('演示');
+})();
+</script>
+</body>
+</html>

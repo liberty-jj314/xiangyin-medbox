@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- ★ 声明图标：不声明的话浏览器会自动去要 /favicon.ico → 404 报错（2026-10-15 补） -->
+<link rel="icon" type="image/png" href="icon-192.png">
+<title>乡音药箱 · 地区问药活跃度</title>
+<!--
+  地区问药活跃度后台（D25 新增）—— 只在电脑上给评委/团队看的页面。
+
+  ★ 三条口径写死在代码里，改之前先读：
+    1. 图上画的是「行政区着色」——一个市一个色块，不是精确点位。
+       我们知道的是"老人自愿选了哪个市"，不是"老人在哪"。
+    2. 切到"演示数据"时，页面上会挂一条常驻红条，不可能被忽略。
+       演示样本根本不在数据库里（它是 stat_store.py 里的常量）。
+    3. 断网/密钥读不到时，自动降级成"方块地图"，绝不白屏。
+
+  访问限制：server.py 里 /admin 与 /api/stat、/api/mapkey 都只允许 127.0.0.1。
+           所以这个页面在局域网里别人打不开。
+-->
+<style>
+  :root {
+    --ink: #0B3A28;
+    --ink-soft: #4A5C50;
+    --gold: #C8A05A;
+    --paper: #F7F5EF;
+    --card: #FFFFFF;
+    --line: rgba(11, 58, 40, 0.16);
+    --c0: #EDEBE3;
+    --c1: #C0DD97;
+    --c2: #639922;
+    --c3: #3B6D11;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    padding: 16px 20px 12px;
+  }
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 12px; margin-bottom: 12px;
+  }
+  h1 { font-size: 22px; margin: 0; letter-spacing: 0.5px; }
+  h1 small { font-size: 14px; font-weight: normal; color: var(--ink-soft); margin-left: 10px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--card); }
+  .seg button {
+    border: 0; background: transparent; color: var(--ink);
+    font-family: inherit; font-size: 15px; padding: 9px 16px; cursor: pointer;
+  }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button.on { background: var(--ink); color: #F6EFDA; }
+  .segs { display: flex; gap: 10px; flex-wrap: wrap; }
+
+  #banner {
+    display: none; margin-bottom: 12px; padding: 11px 16px;
+    border-radius: 10px; font-size: 15px; font-weight: bold;
+    background: #FCEBEB; color: #501313; border: 1px solid #F09595;
+  }
+  #banner.ok { background: #EAF3DE; color: #173404; border-color: #97C459; }
+
+  .wrap { display: flex; gap: 14px; align-items: stretch; }
+  #stage {
+    flex: 1 1 auto; position: relative; min-width: 0;
+    height: 66vh; min-height: 460px;
+    border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+    background: var(--card);
+  }
+  #map { width: 100%; height: 100%; }
+  /* ★★ 2026-10-19 新增：本地 SVG 兜底底图。
+     高德底图来自外网 CDN（webapi.amap.com），现场网络差时会加载不出来。
+     这一层完全用本地 gx_counties.json 的坐标画，不发一个网络请求，
+     所以「高德还没到 / 加载失败」时也有底图可看，111 个县的色块照样能讲。 */
+  #mapSvgWrap { position: absolute; inset: 0; display: none; }
+  #mapSvgWrap.on { display: block; }
+  #mapSvgWrap svg { width: 100%; height: 100%; display: block; }
+  #mapSvgWrap path.off { stroke: #FFFFFF; stroke-width: 1.2; stroke-opacity: 0.9; fill: #EDEBE3; }
+  #mapSvgWrap text.lab {
+    font-family: system-ui, sans-serif; font-size: 11px; font-weight: bold;
+    text-anchor: middle; dominant-baseline: central;
+  }
+  #mapLoading {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    padding: 10px 18px; border-radius: 8px; font-size: 14px;
+    background: rgba(255,255,255,0.96); color: var(--ink);
+    border: 1px solid var(--line); box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+    z-index: 6; display: none;
+  }
+  #mapLoading.on { display: block; }
+
+  #mapBtns { position: absolute; right: 12px; top: 12px; display: flex; gap: 8px; z-index: 5; }
+  #mapBtns button {
+    font-family: inherit; font-size: 14px; padding: 8px 14px; cursor: pointer;
+    background: rgba(255,255,255,0.96); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  }
+  #mapBtns button:hover { border-color: var(--gold); }
+
+  #legend {
+    position: absolute; left: 12px; bottom: 12px; z-index: 5;
+    background: rgba(255,255,255,0.96); border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px 12px; font-size: 13px; line-height: 1.9;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  }
+  #legend b { display: block; font-size: 13px; margin-bottom: 4px; }
+  .sw { display: inline-block; width: 14px; height: 14px; border-radius: 3px;
+        border: 1px solid rgba(0,0,0,0.12); vertical-align: -2px; margin-right: 7px; }
+  #legend .note { margin-top: 6px; color: var(--ink-soft); font-size: 12px;
+                  border-top: 1px solid var(--line); padding-top: 6px; }
+
+  #overlay {
+    position: absolute; inset: 0; z-index: 4; display: none;
+    align-items: center; justify-content: center; text-align: center;
+    background: rgba(247,245,239,0.93); padding: 24px;
+  }
+  #overlay.on { display: flex; }
+  #overlay .box { max-width: 520px; }
+  #overlay h2 { font-size: 19px; margin: 0 0 10px; }
+  #overlay p { font-size: 15px; line-height: 1.75; color: var(--ink-soft); margin: 0; }
+
+  #tileMap { display: none; padding: 18px; height: 100%; overflow: auto; }
+  #tileMap.on { display: block; }
+  #tileGrid { display: block; max-width: 720px; margin: 0 auto; }
+  .tileGroup { margin-bottom: 14px; }
+  .tileCity { font-size: 14px; font-weight: bold; color: #173404; margin: 6px 0 6px; }
+  .tileGroup .tile { display: inline-flex; flex-direction: column; justify-content: space-between;
+                     border-radius: 8px; padding: 8px 10px; margin: 0 6px 6px 0; min-width: 96px;
+                     min-height: 52px; vertical-align: top; border: 1px solid rgba(0,0,0,0.08); }
+  .tile .tname { font-size: 13px; line-height: 1.3; }
+  .tile .tnum { font-size: 15px; font-weight: bold; }
+  .tileEmpty { color: #888; padding: 30px; text-align: center; font-size: 15px; }
+  #rankList .nm small { display: block; font-size: 11px; color: #999; font-weight: normal; }
+  #rankList li.empty { color: #999; text-align: center; }
+
+  #rank {
+    flex: 0 0 236px; border: 1px solid var(--line); border-radius: 12px;
+    background: var(--card); padding: 14px; overflow: auto; max-height: 66vh;
+  }
+  #rank h3 { font-size: 15px; margin: 0 0 10px; }
+  #rank ol { margin: 0; padding-left: 0; list-style: none; }
+  #rank li { display: flex; align-items: center; gap: 8px; padding: 6px 0;
+             border-bottom: 1px dashed var(--line); font-size: 14px; }
+  #rank li:last-child { border-bottom: 0; }
+  #rank .idx { width: 20px; color: var(--ink-soft); font-size: 13px; }
+  #rank .nm { flex: 1 1 auto; }
+  #rank .ct { font-weight: bold; }
+  #rank .bar { height: 6px; border-radius: 3px; background: var(--c2); }
+
+  /* ★ P1-11 数据管理区 */
+  #dataBox { margin-top: 14px; border: 1px solid var(--line); border-radius: 12px;
+             background: var(--card); padding: 14px 16px; }
+  #dataBox h3 { font-size: 15px; margin: 0 0 8px; }
+  #dataBox .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  #dataBox button { font: inherit; font-size: 14px; padding: 7px 13px;
+                    border: 1px solid var(--line); border-radius: 8px;
+                    background: var(--bg); color: var(--ink); cursor: pointer; }
+  #dataBox button:hover { border-color: var(--c2); }
+  #dataBox .pill { font-size: 13px; padding: 4px 10px; border-radius: 999px;
+                   border: 1px solid var(--line); color: var(--ink-soft); }
+  #dataBox .pill.off { border-color: var(--c1); color: var(--c1); }
+  #dataBox .pill.on  { border-color: var(--c2); color: var(--c2); }
+  #rank .barwrap { flex: 0 0 52px; background: #EFEDE6; border-radius: 3px; height: 6px; }
+
+  footer {
+    margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line);
+    font-size: 13px; color: var(--ink-soft); line-height: 1.85;
+  }
+  footer b { color: var(--ink); }
+  .kpi { display: flex; gap: 22px; flex-wrap: wrap; margin: 0 0 10px; }
+  .kpi div { font-size: 13px; color: var(--ink-soft); }
+  .kpi strong { display: block; font-size: 24px; color: var(--ink); }
+
+  @media (max-width: 980px) {
+    .wrap { flex-direction: column; }
+    #rank { flex: 1 1 auto; max-height: none; }
+    #stage { height: 56vh; }
+  }
+
+body.review-mode .wrap,body.review-mode #kpi,body.review-mode #dataBox {display:none!important}
+body.review-mode #banner {background:#eef5e8;border-color:#9aaf89;color:#294824}
+#reviewPanel {max-width:1280px;margin:20px auto;padding:24px;background:white;border:1px solid #dce2d3;border-radius:14px}
+#reviewPanel[hidden] {display:none}
+.review-tools{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:16px 0}
+.review-tools input,.review-tools select,#reviewDialog select,#reviewDialog textarea{padding:10px;border:1px solid #b6c4ad;border-radius:7px;font:inherit}
+.review-tools button,#reviewDialog button{padding:10px 16px;border:1px solid #6a8357;border-radius:7px;background:#eff4e8;color:#23451b;cursor:pointer}
+.review-table-wrap{overflow:auto}#reviewTable{width:100%;border-collapse:collapse;min-width:780px}#reviewTable th,#reviewTable td{text-align:left;padding:13px 10px;border-bottom:1px solid #e1e5da;vertical-align:top}
+#reviewTable th{background:#f2f5ec}#reviewTable td:nth-child(3){max-width:380px;overflow-wrap:anywhere}
+#reviewDialog{width:min(850px,88vw);max-height:85vh;border:1px solid #9cab90;border-radius:14px;padding:24px;overflow:auto}
+#reviewDialog::backdrop{background:#0007}#reviewDialog pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f5f6f0;padding:14px;border-radius:8px;max-height:260px;overflow:auto;font:inherit}
+#reviewNote{width:100%;box-sizing:border-box;min-height:90px}#reviewSaveMessage{color:#984500}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>乡音药箱 · 地区问药活跃度<small>广西 111 个县（区、市）</small></h1>
+  <div class="segs">
+    <div class="seg" id="rangeSeg">
+      <button type="button" data-days="7" class="on">近 7 天</button>
+      <button type="button" data-days="30">近 30 天</button>
+    </div>
+    <div class="seg" id="kindSeg">
+      <button type="button" data-kind="real" class="on">真实数据</button>
+      <button type="button" data-kind="demo">模拟数据</button>
+      <button type="button" data-kind="review">后台实测数据</button>
+    </div>
+  </div>
+</header>
+
+<div id="banner"></div>
+
+<div class="kpi" id="kpi"></div>
+
+<div class="wrap">
+  <div id="stage">
+    <div id="map"></div>
+    <div id="mapSvgWrap"><svg id="mapSvg" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid meet"></svg></div>
+    <div id="mapLoading">正在加载地图…</div>
+    <div id="tileMap"><div id="tileGrid"></div></div>
+    <div id="mapBtns">
+      <button type="button" id="btnAll">看全国</button>
+      <button type="button" id="btnGX">回到广西</button>
+    </div>
+    <div id="legend">
+      <b>问药完成次数</b>
+      <span class="sw" style="background:var(--c0)"></span>0 次<br>
+      <span class="sw" style="background:var(--c1)"></span>1–2 次<br>
+      <span class="sw" style="background:var(--c2)"></span>3–5 次<br>
+      <span class="sw" style="background:var(--c3)"></span>6 次以上
+      <div class="note">每县一个色块，不是精确点位<br>仅广西 111 县有数据，其他省份不参与统计</div>
+    </div>
+    <div id="overlay"><div class="box" id="overlayBox"></div></div>
+  </div>
+  <div id="rank">
+    <h3>县区排行</h3>
+    <ol id="rankList"></ol>
+  </div>
+</div>
+
+<!-- ★★ P1-11 数据管理（2026-10-16 新增）=====================
+     放这里而不是设置页，是因为这个后台本来就"只准本机打开"，
+     数据开关和统计看板放一起，老人/评委一眼就能看到"这台机器留了什么"。
+     ★ 诚实优先：宁可把"我们存了什么、没存什么"摆在明面上，
+       也不要让评委自己猜。 -->
+<div id="dataBox">
+  <h3>数据管理（本机）</h3>
+  <p class="note" style="margin-bottom:10px">
+    照片与录音<b>不落盘</b>；识别出的药盒文字会<b>随问题一起发给大模型</b>，
+    下面的开关仅控制独立OCR文本存档，不会停止“后台实测数据”的问答记录。
+  </p>
+  <div class="row">
+    <span id="logState" class="pill">正在读取…</span>
+    <button type="button" id="btnLogToggle">关闭存档</button>
+    <button type="button" id="btnLogClear">清理已有存档</button>
+  </div>
+  <div class="note" style="margin-top:8px">
+    关闭后<b>不再产生独立OCR文本文件</b>，实测数据库继续记录，已存档文本不受影响（需点右侧"清理"才会删除）。
+    超过 <b id="keepDays">30</b> 天的存档会自动删除。
+  </div>
+</div>
+
+
+<section id="reviewPanel" hidden>
+  <h2>后台实测数据 · 人工审核</h2>
+  <p>查看真实识别与问答记录。未定位的使用也会记录；模拟地图数据不进入这里。审核只登记核查结果，不自动改写药品资料或用户已收到的答案。</p>
+  <div class="review-tools">
+    <label>状态 <select id="reviewFilter"><option value="all">全部问答</option><option value="pending">待审核</option><option value="approved">审核通过</option><option value="rejected">需要修正</option><option value="unasked">仅识别、尚未问药</option></select></label>
+    <label>搜索 <input id="reviewSearch" maxlength="120" placeholder="药名、问题或药盒文字"></label>
+    <button id="reviewSearchButton" type="button">搜索</button><button id="reviewRefresh" type="button">刷新记录</button>
+  </div>
+  <div id="reviewSummary" role="status" aria-live="polite"></div>
+  <div class="review-table-wrap"><table id="reviewTable"><thead><tr><th>时间</th><th>识别药名</th><th>用户问题</th><th>地区</th><th>回答状态</th><th>审核状态</th><th>操作</th></tr></thead><tbody id="reviewRows"></tbody></table></div>
+  <div class="review-tools"><button id="reviewPrev" type="button">上一页</button><span id="reviewPage"></span><button id="reviewNext" type="button">下一页</button></div>
+</section>
+<dialog id="reviewDialog" aria-labelledby="reviewTitle">
+  <div style="display:flex;justify-content:space-between;align-items:center"><h2 id="reviewTitle">实测记录详情</h2><button id="reviewClose" type="button">关闭</button></div>
+  <div id="reviewMeta"></div>
+  <h3>药盒识别原文</h3><pre id="reviewOcr"></pre>
+  <h3>用户问题</h3><pre id="reviewQuestion"></pre>
+  <h3>实际返回的回答</h3><pre id="reviewAnswer"></pre>
+  <details><summary>回答依据和使用的乡音</summary><pre id="reviewCitation"></pre></details>
+  <div id="reviewForm"><h3>人工审核</h3><label>审核结果 <select id="reviewStatus"><option value="pending">待审核</option><option value="approved">审核通过</option><option value="rejected">需要修正</option></select></label>
+    <p><label for="reviewNote">审核备注（最多2000字）</label></p><textarea id="reviewNote" maxlength="2000"></textarea>
+    <button id="reviewSave" type="button">保存审核</button><div id="reviewSaveMessage" role="status"></div>
+    <details><summary>审核修改记录</summary><pre id="reviewHistory"></pre></details>
+  </div>
+</dialog>
+
+<footer>
+  <div><b>口径：</b>统计的是<b>问药完成次数</b>（同一人问 5 次记 5 次），不是"老人数量"、不是"用户数"。</div>
+  <div><b>数据来源：</b>本版本起，新县区统计仅使用用户确认或人工校准的县区，设备建议未经确认不计数。历史合计可能包含旧版未确认设备估计，不能倒推真实所在地；不将任何人工确认称为GPS。拒绝或失败照常问药。</div>
+  <div><b>存储范围：</b>地图库只存日期、县代码、次数；实测库另存识别文字、问题、回答与审核状态。两者均不保存坐标、照片、录音或设备标识。</div>
+  <div id="footNote"></div>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  // 方块降级的排布：县级有 111 个，没法像 14 市那样手排 5 列。
+  // 改成「只显示有数据的县」，按市分组、市内按代码排序，网格自适应。
+  // ★ 它同样不是地图：没有海岸线/边界/疆域，只是一张按市分组的表格，
+  //   所以不涉及地图合规，断网时兜底最安全。
+  var TILE_CITY_ORDER = ['4501', '4502', '4503', '4504', '4505', '4506', '4507',
+                         '4508', '4509', '4510', '4511', '4512', '4513', '4514'];
+
+  // 支持用网址把视图提前摆好，方便演示前先把页面开在后台等着：
+  //    /admin?kind=demo&days=30    → 直接打开「演示数据 · 近 30 天」
+  //    /admin?kind=real&days=7     → 真实记录 · 近 7 天（等于默认）
+  // 不写参数 = 默认「真实记录 · 近 7 天」。参数只认白名单值，乱写一律回默认。
+  function readUrlState() {
+    var s = { days: 7, kind: 'real', data: null };
+    var q;
+    try { q = new URLSearchParams(location.search); } catch (e) { return s; }
+    var d = parseInt(q.get('days'), 10);
+    if (d === 7 || d === 30) { s.days = d; }
+    var k = q.get('kind');
+    if (k === 'demo' || k === 'real' || k === 'review') { s.kind = k; }
+    return s;
+  }
+  var state = readUrlState();
+  var names = {};                 // 县代码 -> 名称（服务端下发）
+  var cityOf = {};                // 县代码 -> 所属市名（服务端下发）
+  var map = null;                 // 高德地图实例
+  var shapes = {};                // 代码 -> {polygons, label}
+  var shapesBuilt = false;
+  var mapFailed = false;
+  // ★★ 2026-10-19：本地 SVG 兜底底图是否已画好（高德还没来 / 来不了时用）
+  var offlineShapes = false;
+  // 「演示数据」那句提醒，点过"知道了"之后本次打开就不再弹，
+  // 免得讲解时一按「近 30 天」就被重新盖住地图。
+  // 只记在内存里：刷新或重新打开页面，提醒会再出现一次（这是故意的）。
+  var demoOverlayDismissed = false;
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---------------- 颜色分档（和图例一一对应，别随便改） ----------------
+  function colorOf(n) {
+    if (!n) { return '#EDEBE3'; }
+    if (n <= 2) { return '#C0DD97'; }
+    if (n <= 5) { return '#639922'; }
+    return '#3B6D11';
+  }
+  function textColorOf(n) { return n >= 3 ? '#FFFFFF' : '#173404'; }
+
+  // ---------------- 顶部横幅：演示数据必须一眼可见 ----------------
+  function renderBanner(d) {
+    var el = $('banner');
+    if (d.is_demo) {
+      el.className = '';
+      el.innerHTML = '★ 当前显示：<b>演示数据</b>（非真实用户记录）—— 讲解用，勿当作真实统计结果';
+      el.style.display = 'block';
+    } else {
+      el.className = 'ok';
+      el.innerHTML = '当前显示：<b>真实记录</b>（真实完成的问药请求；含开发期间的调试请求）';
+      el.style.display = 'block';
+    }
+  }
+
+  // ---------------- 顶部数字 ----------------
+  function renderKpi(d) {
+    var top = topCounty(d);
+    $('kpi').innerHTML =
+      '<div>问药完成次数<strong>' + d.total + '</strong></div>' +
+      '<div>出现记录的县<strong>' + countyCount(d) + ' / 111</strong></div>' +
+      '<div>次数最多的县<strong>' + (top ? top[1] + ' · ' + top[2] : '—') + '</strong></div>' +
+      '<div>统计区间<strong style="font-size:15px">' + d.date_from + ' ~ ' + d.date_to + '</strong></div>';
+  }
+
+  function countyCount(d) {
+    var n = 0, k;
+    for (k in d.counties) { if (d.counties[k] > 0) { n++; } }
+    return n;
+  }
+  function topCounty(d) {
+    var best = null, k;
+    for (k in d.counties) {
+      var name = names[k] || k;
+      if (!best || d.counties[k] > best[2]) { best = [k, name, d.counties[k]]; }
+    }
+    return (best && best[2] > 0) ? best : null;
+  }
+
+  // ---------------- 排行 ----------------
+  function renderRank(d) {
+    var arr = [], k;
+    for (k in d.counties) { arr.push([k, names[k] || k, cityOf[k] || '', d.counties[k]]); }
+    arr.sort(function (a, b) { return b[3] - a[3]; });
+    // 只显示有数据的县（无数据的 111 个全列出来太冗长）
+    arr = arr.filter(function (x) { return x[3] > 0; });
+    var max = arr.length ? arr[0][3] : 0;
+    var html = '';
+    for (var i = 0; i < arr.length; i++) {
+      var w = max ? Math.round(arr[i][3] / max * 100) : 0;
+      html += '<li>' +
+        '<span class="idx">' + (i + 1) + '</span>' +
+        '<span class="nm">' + arr[i][1] + '<small>' + arr[i][2] + '</small></span>' +
+        '<span class="barwrap"><span class="bar" style="display:block;width:' + w + '%;height:6px;border-radius:3px;background:' + colorOf(arr[i][3]) + '"></span></span>' +
+        '<span class="ct">' + arr[i][3] + '</span>' +
+      '</li>';
+    }
+    if (!arr.length) { html = '<li class="empty">暂无记录</li>'; }
+    $('rankList').innerHTML = html;
+  }
+
+  // ---------------- 空状态 ----------------
+  function renderOverlay(d) {
+    var ov = $('overlay');
+    if (!d.is_demo && d.total === 0) {
+      $('overlayBox').innerHTML =
+        '<h2>暂无真实记录</h2>' +
+        '<p>这个页面<b>只显示真实使用产生的数据</b>，不预填任何数字。<br>' +
+        '老人在问药页面确认实际县区、并完成一次问药之后，这里就会实时出现记录。<br><br>' +
+        '想先看这套后台长什么样，请点右上角「<b>演示数据</b>」。</p>';
+      ov.className = 'on';
+      return;
+    }
+    if (d.is_demo) {
+      if (demoOverlayDismissed) { ov.className = ''; return; }
+      $('overlayBox').innerHTML =
+        '<h2>演示数据</h2>' +
+        '<p>下面这些县区色块是<b>演示样本</b>，用来讲解后台能做什么。<br>' +
+        '它们不在数据库里，也不会和真实记录混算。</p>' +
+        '<p style="margin-top:10px"><button type="button" id="btnKnowDemo" ' +
+        'style="font-family:inherit;font-size:15px;padding:9px 18px;border-radius:8px;border:1px solid rgba(11,58,40,0.2);background:#fff;cursor:pointer">知道了，看地图</button></p>';
+      ov.className = 'on';
+      // 用 JS 绑事件，不写 onclick="..." —— 内联脚本里再塞引号容易出错
+      $('btnKnowDemo').onclick = function () {
+        demoOverlayDismissed = true;
+        ov.className = '';
+      };
+      return;
+    }
+    ov.className = '';
+  }
+
+  // ---------------- 方块地图（断网降级 / 无地图时的兜底） ----------------
+  // 县级有 111 个，降级时只显示「有数据的县」，按市分组、市内按代码排序。
+  function renderTileMap(d) {
+    var byCity = {}, cityName = {}, k;
+    for (k in d.counties) {
+      if (d.counties[k] <= 0) { continue; }
+      var p = k.slice(0, 4);
+      if (!byCity[p]) { byCity[p] = []; cityName[p] = ''; }
+      byCity[p].push(k);
+    }
+    // 补全市名（从 names 里拿不到市名，用 cityOf 反查 + 硬编码市名表）
+    var CITY_NAMES = { '4501': '南宁市', '4502': '柳州市', '4503': '桂林市', '4504': '梧州市',
+                       '4505': '北海市', '4506': '防城港市', '4507': '钦州市', '4508': '贵港市',
+                       '4509': '玉林市', '4510': '百色市', '4511': '贺州市', '4512': '河池市',
+                       '4513': '来宾市', '4514': '崇左市' };
+    var html = '';
+    var any = false;
+    for (var i = 0; i < TILE_CITY_ORDER.length; i++) {
+      var cp = TILE_CITY_ORDER[i];
+      if (!byCity[cp]) { continue; }
+      any = true;
+      html += '<div class="tileGroup">';
+      html += '<div class="tileCity">' + CITY_NAMES[cp] + '</div>';
+      byCity[cp].sort();
+      for (var j = 0; j < byCity[cp].length; j++) {
+        var code = byCity[cp][j];
+        var n = d.counties[code] || 0;
+        var bg = colorOf(n);
+        var fg = n >= 3 ? '#FFFFFF' : '#2C2C2A';
+        html += '<div class="tile" style="background:' + bg + '">' +
+                  '<span class="tname" style="color:' + fg + '">' + (names[code] || code) + '</span>' +
+                  '<span class="tnum" style="color:' + fg + '">' + n + '</span>' +
+                '</div>';
+      }
+      html += '</div>';
+    }
+    if (!any) { html = '<div class="tileEmpty">暂无记录（或当前是空状态）</div>'; }
+    $('tileGrid').innerHTML = html;
+  }
+
+  function useFallback(reason) {
+    mapFailed = true;
+    hideMapLoading();
+    if (offlineShapes) { $('mapSvgWrap').className = ''; }
+    $('tileMap').className = 'on';
+    $('map').style.display = 'none';
+    $('mapBtns').style.display = 'none';
+    var el = $('banner');
+    if (!el.innerHTML) { el.style.display = 'block'; }
+    $('legend').style.display = 'none';
+    $('footNote').innerHTML = '<b>地图降级：</b>' + reason + ' —— 已自动切换成方块地图，数据完全一样。';
+  }
+
+  // ---------------- 高德地图 ----------------
+  //
+  // ★ 为什么边界不"现查"，而是用一个本地文件：
+  //   高德的 DistrictSearch 只在"查它自己"的时候才返回边界坐标。
+  //   查「广西壮族自治区」并要求下一级（subdistrict:1/2）时，
+  //   14 市 / 111 县只给名字和中心点，boundaries 是**空数组** —— 接口的既有行为，
+  //   不是我们参数写错了（已实测确认，见开发日志 D25 / D26）。
+  //   改成"逐个县去查"又会触发限流：111 个并行请求大部分超时。
+  //   → 所以：**事先用高德逐县查一次，把 111 个县的边界存成本地文件**
+  //     （02_代码/gx_counties.json，坐标直接来自高德，一个字没改过）。
+  //     页面运行时读本地文件 → 秒开，也不受高德接口限流影响。
+  //   底图、坐标、边界数据仍然全部是高德提供的，合规性没有变化。
+  var BOUNDARY_FILE = 'gx_counties.json';
+
+  function loadAmap() {
+    showMapLoading('正在加载地图…');
+    // ★★ 第一步先把本地边界读出来画上底图，不等高德。
+    //    这样即使外网不通、县块图也不至于是一片空白 —— 现场讲解有东西可指。
+    loadLocalShapesFirst();
+    fetch('/api/mapkey')
+      .then(function (r) { return r.json(); })
+      .then(function (k) {
+        if (!k.ok) {
+          keepOfflineMap('没读到高德密钥（应放在 01_资料/高德地图密钥.txt）');
+          return;
+        }
+        // ★ 顺序不能反：安全密钥必须在 SDK 之前挂到 window 上
+        window._AMapSecurityConfig = { securityJsCode: k.security };
+        var s = document.createElement('script');
+        s.src = 'https://webapi.amap.com/maps?v=2.0&key=' + encodeURIComponent(k.key);
+        s.onload = function () { initMap(); };
+        s.onerror = function () { keepOfflineMap('地图服务加载失败（多半是断网了）'); };
+        document.head.appendChild(s);
+        // ★ 12 秒 → 30 秒（2026-10-19）：现场 WiFi / 手机热点偏慢，
+        //   12 秒太容易误判成失败。30 秒内能到就正常出高德底图。
+        setTimeout(function () {
+          if (!shapesBuilt && !mapFailed) { keepOfflineMap('地图服务 30 秒还没到（多半是现场网络慢）'); }
+        }, 30000);
+      })
+      .catch(function () { keepOfflineMap('拿不到地图密钥接口'); });
+  }
+
+  function showMapLoading(tip) {
+    var el = $('mapLoading');
+    if (el) { el.textContent = tip; el.className = 'on'; }
+  }
+  function hideMapLoading() {
+    var el = $('mapLoading');
+    if (el) { el.className = ''; }
+  }
+
+  // ★★ 本地兜底底图：用 gx_counties.json 的坐标直接画 SVG，一个网络请求都不发。
+  //   为什么值得做：现场演示最怕"投屏上一片空白，问什么都等不出来"。
+  //   高德只是底图（道路、河流、文字地名那些装饰），**数据配色全部来自本地文件**，
+  //   所以没有高德也完全能讲"哪个县问药多"。
+  function loadLocalShapesFirst() {
+    fetch(BOUNDARY_FILE)
+      .then(function (r) { return r.json(); })
+      .then(function (g) { drawOfflineSvg(g && g.counties); })
+      .catch(function () { /* 本地文件也读不到就什么都不画，等高德 */ });
+  }
+
+  function drawOfflineSvg(counties) {
+    if (!counties) { return; }
+    var code, made = 0, minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9, i, j;
+    // 先扫一遍经纬度范围，用来算缩放
+    for (code in counties) {
+      var raw = counties[code];
+      if (!raw || !raw.length) { continue; }
+      for (i = 0; i < raw.length; i++) {
+        for (j = 0; j < raw[i].length; j++) {
+          var x = raw[i][j][0], y = raw[i][j][1];
+          if (x < minX) { minX = x; } if (x > maxX) { maxX = x; }
+          if (y < minY) { minY = y; } if (y > maxY) { maxY = y; }
+        }
+      }
+    }
+    if (made === 0 && minX > maxX) { return; }
+
+    var W = 1000, H = 1000, pad = 24;
+    var spanX = (maxX - minX) || 1, spanY = (maxY - minY) || 1;
+    // 广西南北跨度大于东西，取同一比例 → 形状不变形
+    var scale = Math.min((W - pad * 2) / spanX, (H - pad * 2) / spanY);
+    var offX = (W - spanX * scale) / 2, offY = (H - spanY * scale) / 2;
+    function px(lng) { return (lng - minX) * scale + offX; }
+    function py(lat) { return (H - (lat - minY) * scale - offY); }
+
+    var parts = [], labels = [];
+    for (code in counties) {
+      var rings = counties[code];
+      if (!rings || !rings.length) { continue; }
+      var d = '';
+      var best = null, bestLen = -1;
+      for (i = 0; i < rings.length; i++) {
+        var ring = rings[i], seg = '';
+        for (j = 0; j < ring.length; j++) {
+          seg += (j ? 'L' : 'M') + px(ring[j][0]).toFixed(1) + ' ' + py(ring[j][1]).toFixed(1);
+        }
+        seg += 'Z';
+        d += seg;
+        if (ring.length > bestLen) { bestLen = ring.length; best = ring; }  // 点数最多的环 = 主陆地
+      }
+      if (!d) { continue; }
+      made++;
+      parts.push('<path class="off" data-c="' + code + '" d="' + d + '"></path>');
+      if (best && best.length) {
+        var sx = 0, sy = 0;
+        for (var k = 0; k < best.length; k++) { sx += best[k][0]; sy += best[k][1]; }
+        sx = px(sx / best.length); sy = py(sy / best.length);
+        labels.push('<text class="lab" data-c="' + code + '" x="' + sx.toFixed(1) + '" y="' + sy.toFixed(1) + '"></text>');
+      }
+    }
+    if (!made) { return; }
+
+    var svg = $('mapSvg');
+    if (!svg) { return; }
+    //底图色与高德 whitesmoke 保持一致，切换时颜色不会跳
+    svg.innerHTML = '<rect x="0" y="0" width="1000" height="1000" fill="#F5F3EC"></rect>'
+      + parts.join('') + labels.join('');
+    $('mapSvgWrap').className = 'on';
+    offlineShapes = true;
+    // 高德还没到时，先用本地数据把颜色也刷上
+    paintOffline();
+  }
+
+  // 离线底图模式下刷新配色（跟 paintMap 一一对应）
+  function paintOffline() {
+    if (!offlineShapes || !state.data) { return; }
+    var d = state.data, nodes = document.querySelectorAll('#mapSvg path.off'), i;
+    for (i = 0; i < nodes.length; i++) {
+      var code = nodes[i].getAttribute('data-c');
+      nodes[i].setAttribute('fill', colorOf(d.counties[code] || 0));
+    }
+    var labs = document.querySelectorAll('#mapSvg text.lab');
+    for (i = 0; i < labs.length; i++) {
+      var c2 = labs[i].getAttribute('data-c'), n2 = d.counties[c2] || 0;
+      if (n2 > 0) {
+        labs[i].textContent = (names[c2] || c2) + ' ' + n2;
+        labs[i].setAttribute('fill', n2 >= 3 ? '#FFFFFF' : '#173404');
+        labs[i].setAttribute('display', 'inline');
+      } else {
+        labs[i].setAttribute('display', 'none');
+      }
+    }
+  }
+
+  // 高德没来 / 加载失败：保留本地底图，只提示一句，**不再退成方块地图**。
+  // 这是 2026-10-19 的关键改动：方块地图在投屏上看不出"这是广西地图"，
+  // 而本地 SVG 底图上的 111 个县是真形状，讲"地区问药活跃度"完全够用。
+  function keepOfflineMap(reason) {
+    hideMapLoading();
+    if (shapesBuilt) { return; }          // 高德已经画好了 → 什么都不用动
+    if (offlineShapes) {
+      var el = $('banner');
+      if (!el.innerHTML) { el.style.display = 'block'; }
+      $('footNote').innerHTML = '<b>离线底图：</b>' + reason
+        + ' —— 已改用本地坐标绘制（数据完全一样，只是没有道路等底图细节）。';
+      return;
+    }
+    //连本地坐标都读不到 → 才退到方块地图
+    useFallback(reason);
+  }
+
+  function initMap() {
+    if (!window.AMap) { keepOfflineMap('地图脚本没有就绪'); return; }
+    hideMapLoading();
+    map = new AMap.Map('map', {
+      zoom: 7,
+      center: [108.4, 23.8],
+      resizeEnable: true,
+      mapStyle: 'amap://styles/whitesmoke'   // 干净底图，色块才看得清
+    });
+    fetch(BOUNDARY_FILE)
+      .then(function (r) { return r.json(); })
+      .then(function (g) { buildShapes(g && g.counties); })
+      .catch(function () { useFallback('读不到本地边界文件 ' + BOUNDARY_FILE); });
+  }
+
+  // 用本地边界数据把 111 个县的色块与标签建出来
+  function buildShapes(counties) {
+    if (!counties) { useFallback('边界文件里没有 counties 字段'); return; }
+    var code, made = 0;
+    for (code in counties) {
+      var raw = counties[code];
+      if (!raw || !raw.length) { continue; }
+
+      // ① [[lng,lat], ...] -> AMap.LngLat
+      var rings = [];
+      for (var i = 0; i < raw.length; i++) {
+        var ring = [];
+        for (var j = 0; j < raw[i].length; j++) {
+          ring.push(new AMap.LngLat(raw[i][j][0], raw[i][j][1]));
+        }
+        rings.push(ring);
+      }
+      // ② 按点数从多到少排：点数最多的那个环就是"主陆地"，标签放它中间
+      rings.sort(function (a, b) { return b.length - a.length; });
+
+      // ③ ★ 一个环画一个多边形 —— 千万别把几个环塞进同一个 path。
+      //    实测（D25）：把多环塞进一个 path 时，高德会当成"外圈 + 若干个洞"，
+      //    于是 百色 / 北海 / 钦州 这三个带岛的市，主陆地被当成洞挖空，
+      //    整块颜色消失、标签也跑到小岛上去（三个市的症状完全一致）。
+      var polygons = [];
+      for (var k = 0; k < rings.length; k++) {
+        var pg = new AMap.Polygon({
+          path: rings[k],
+          strokeColor: '#FFFFFF',
+          strokeWeight: k === 0 ? 1.2 : 0.8,
+          strokeOpacity: 0.9,
+          fillColor: '#EDEBE3',
+          fillOpacity: 0.88,
+          cursor: 'pointer',
+          zIndex: 10
+        });
+        map.add(pg);
+        polygons.push(pg);
+      }
+
+      // ④ 标签放在主陆地（也就是点数最多的那个环）的外框中心
+      //    县级 111 个太密，标签默认隐藏、只在 paintMap 里对有数据的县 show()。
+      var label = null;
+      try {
+        var c = polygons[0].getBounds().getCenter();
+        label = new AMap.Text({
+          text: '',
+          position: [c.getLng(), c.getLat()],
+          anchor: 'center',
+          zIndex: 30,
+          style: {
+            'background': 'rgba(255,255,255,0.0)',
+            'border': '0',
+            'font-size': '11px',
+            'font-weight': 'bold',
+            'text-align': 'center',
+            'white-space': 'nowrap'
+          }
+        });
+        map.add(label);
+        label.hide();
+      } catch (e) { label = null; }
+
+      shapes[code] = { polygons: polygons, label: label };
+      made++;
+    }
+    if (!made) { useFallback('边界文件里没有任何县'); return; }
+    shapesBuilt = true;
+    // ★ 高德的真实底图已经画好 → 收起本地 SVG 兜底，避免两层叠在一起
+    if (offlineShapes) { $('mapSvgWrap').className = ''; }
+    map.setFitView(null, false, [30, 30, 30, 30]);
+    paintMap();
+  }
+
+  function paintMap() {
+    if (!shapesBuilt || !state.data) { return; }
+    var d = state.data, code;
+    for (code in shapes) {
+      var n = d.counties[code] || 0;
+      var s = shapes[code], col = colorOf(n);
+      for (var k = 0; k < s.polygons.length; k++) {
+        s.polygons[k].setOptions({ fillColor: col });
+      }
+      // ★ 县级 111 个标签太密：只有「有数据」的县才显示标签，
+      //   否则整张图会被名字糊住，投屏根本看不清。
+      if (s.label) {
+        if (n > 0) {
+          var txt = (names[code] || code) + ' ' + n;
+          s.label.setText(txt);
+          s.label.setStyle({
+            'background': 'rgba(255,255,255,0.0)',
+            'border': '0',
+            'color': n >= 3 ? '#FFFFFF' : '#173404',
+            'font-size': '11px',
+            'font-weight': 'bold',
+            'white-space': 'nowrap'
+          });
+          s.label.show();
+        } else {
+          s.label.hide();
+        }
+      }
+    }
+  }
+
+  // ---------------- 渲染总入口 ----------------
+  function render() {
+    var d = state.data;
+    if (!d) { return; }
+    renderBanner(d);
+    renderKpi(d);
+    renderRank(d);
+    renderOverlay(d);
+    renderTileMap(d);
+    if (!mapFailed) { paintMap(); }
+    // ★ 离线兜底底图也要跟着刷配色，否则高德没来时颜色永远停在初始灰
+    if (offlineShapes && !shapesBuilt) { paintOffline(); }
+  }
+
+  function reloadMap() {
+    return fetch('/api/stat?days=' + state.days + '&kind=' + state.kind)
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        state.data = d;
+        if (d.county_names) { names = d.county_names; }
+        if (d.county_city) { cityOf = d.county_city; }
+        render();
+      });
+  }
+
+  // ---------------- 交互 ----------------
+  function bindSeg(id, key, after) {
+    $(id).addEventListener('click', function (e) {
+      var b = e.target;
+      if (b.tagName !== 'BUTTON') { return; }
+      var btns = $(id).getElementsByTagName('button');
+      for (var i = 0; i < btns.length; i++) { btns[i].className = ''; }
+      b.className = 'on';
+      state[key] = (key === 'days') ? parseInt(b.getAttribute('data-days'), 10)
+                                    : b.getAttribute('data-kind');
+      if (after) { after(); }
+      reload();
+    });
+  }
+
+  bindSeg('rangeSeg', 'days', null);
+  bindSeg('kindSeg', 'kind', null);
+
+  // 网页里按钮默认是「近 7 天 / 真实记录」写死点亮的。
+  // 如果网址带了 ?kind=demo 之类的参数，得把点亮的位置挪到对应的按钮上，
+  // 否则会出现「显示的是演示数据，点亮的却是真实记录」这种自相矛盾的画面。
+  function syncSegs() {
+    var sets = [['rangeSeg', 'data-days', state.days],
+                ['kindSeg', 'data-kind', state.kind]];
+    for (var i = 0; i < sets.length; i++) {
+      var btns = $(sets[i][0]).getElementsByTagName('button');
+      for (var j = 0; j < btns.length; j++) {
+        var raw = btns[j].getAttribute(sets[i][1]);
+        var v = (sets[i][1] === 'data-days') ? parseInt(raw, 10) : raw;
+        btns[j].className = (v === sets[i][2]) ? 'on' : '';
+      }
+    }
+  }
+  syncSegs();
+
+  $('btnAll').onclick = function () {
+    if (map) { map.setZoomAndCenter(4, [104.0, 35.5]); }
+  };
+  $('btnGX').onclick = function () {
+    if (map) { map.setFitView(null, false, [40, 40, 40, 40]); }
+  };
+
+  // ---------------- P1-11 OCR 存档开关（只准本机访问）----------------
+  // ★ 为什么把开关摆在后台：这份材料最怕的是"评委猜我们留了什么"。
+  //   摆在明面上，并且能当场开关、当场清理 —— 比任何一句承诺都有用。
+  function renderLog(s) {
+    $('logState').className = 'pill ' + (s.enabled ? 'on' : 'off');
+    $('logState').textContent = (s.enabled ? '存档：开启' : '存档：已关闭')
+      + '（当前 ' + s.count + ' 份）';
+    $('btnLogToggle').textContent = s.enabled ? '关闭存档' : '开启存档';
+    $('keepDays').textContent = s.keep_days;
+  }
+
+  function loadLog() {
+    return fetch('/api/ocrlog')
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (d.ok) { renderLog(d); } })
+      .catch(function () {
+        $('logState').className = 'pill off';
+        $('logState').textContent = '读不到状态（本机接口不可用）';
+      });
+  }
+
+  function postLog(action) {
+    return fetch('/api/ocrlog', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: action })
+    }).then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.ok) { renderLog(d); }
+        else { alert('操作失败：' + (d.error || '未知原因')); }
+      })
+      .catch(function (e) { alert('操作失败：' + e); });
+  }
+
+  $('btnLogToggle').onclick = function () {
+    var on = $('btnLogToggle').textContent === '开启存档';
+    postLog(on ? 'on' : 'off');
+  };
+  $('btnLogClear').onclick = function () {
+    // ★ 二次确认：这是不可逆的删除动作，不能一点就没。
+    if (!confirm('确定要删除本机全部 OCR 存档吗？\n'
+                 + '（删除后无法恢复。识别功能本身不受影响，只是没有存档可查。）')) {
+      return;
+    }
+    postLog('clear');
+  };
+
+
+  var reviewPage=1, reviewTotal=0, reviewRequest=0, currentReview=null, detailRequest=0;
+  var reviewLabels={pending:'待审核',approved:'审核通过',rejected:'需要修正',unasked:'尚未问药'};
+  function reviewRegionLabel(row){
+    if(!row.region)return '未提供可靠县区';
+    var label=(cityOf[row.region]||'')+(names[row.region]||row.region);
+    return label+' · '+(row.location_status==='manual'?'人工校准':row.location_status==='confirmed'?'用户确认设备建议':row.location_status==='granted'?'历史设备估计（未经确认）':'历史地区');
+  }
+
+  function jsonResponse(r) {return r.json().then(function(d){if(!r.ok||!d.ok)throw new Error(d.error||'读取失败');return d;});}
+  function loadReviews() {
+    var seq=++reviewRequest;
+    $('reviewSummary').textContent='正在读取实测记录…';
+    return fetch('/api/reviews?page='+reviewPage+'&status='+encodeURIComponent($('reviewFilter').value)+'&search='+encodeURIComponent($('reviewSearch').value))
+    .then(jsonResponse).then(function(d){
+      if(seq!==reviewRequest)return;
+      if(d.county_names)names=d.county_names;if(d.county_city)cityOf=d.county_city;
+      reviewTotal=d.total;$('reviewRows').textContent='';
+      d.rows.forEach(function(r){
+        var tr=document.createElement('tr');
+        [r.created_at.replace('T',' ').slice(0,19),r.drug_name,r.question||'（已识别，尚未提问）',reviewRegionLabel(r),r.answer_status==='answered'?'已回答':r.answer_status==='unasked'?'尚未问药':'已拒答',reviewLabels[r.review_status]].forEach(function(text){var td=document.createElement('td');td.textContent=text;tr.appendChild(td);});
+        var td=document.createElement('td'),button=document.createElement('button');button.type='button';button.textContent='查看 / 审核';button.onclick=function(){openReview(r.id,r.review_status==='unasked'?'unasked':'answer');};td.appendChild(button);tr.appendChild(td);$('reviewRows').appendChild(tr);
+      });
+      var c=d.counts;$('reviewSummary').textContent='问答：待审核 '+(c.pending||0)+' · 审核通过 '+(c.approved||0)+' · 需要修正 '+(c.rejected||0)+'；仅识别未问药 '+d.unasked+' 条。当前筛选 '+d.total+' 条。'+(!d.total?'暂无记录，完成一次识别或问药后刷新即可。':'');
+      $('reviewPage').textContent='第 '+reviewPage+' / '+Math.max(1,Math.ceil(d.total/20))+' 页';$('reviewPrev').disabled=reviewPage<=1;$('reviewNext').disabled=reviewPage*20>=d.total;
+    }).catch(function(e){if(seq===reviewRequest)$('reviewSummary').textContent='读取失败：'+e.message;});
+  }
+  function openReview(id,kind) {
+    var seq=++detailRequest;currentReview=null;$('reviewSave').disabled=true;
+    fetch('/api/reviews?id='+encodeURIComponent(id)+'&kind='+kind).then(jsonResponse).then(function(d){
+      if(seq!==detailRequest)return;var r=d.record;currentReview=r;
+      $('reviewMeta').textContent=r.created_at+' · '+r.drug_name+' · '+reviewRegionLabel(r);
+      $('reviewOcr').textContent=r.ocr_text;$('reviewQuestion').textContent=r.question||'尚未提问';$('reviewAnswer').textContent=r.answer||'尚未产生回答';
+      $('reviewCitation').textContent=JSON.stringify({citation:r.citation||null,voice_file:r.voice_file||'',answer_status:r.answer_status||'unasked',refuse_kind:r.refuse_kind||''},null,2);
+      $('reviewForm').hidden=kind==='unasked';$('reviewStatus').value=r.review_status||'pending';$('reviewNote').value=r.review_note||'';$('reviewSaveMessage').textContent='';$('reviewHistory').textContent=JSON.stringify(r.history||[],null,2);$('reviewSave').disabled=false;
+      if(!$('reviewDialog').open)$('reviewDialog').showModal();
+    }).catch(function(e){$('reviewSummary').textContent='详情读取失败：'+e.message;});
+  }
+  function reload() {
+    var review=state.kind==='review';document.body.classList.toggle('review-mode',review);$('reviewPanel').hidden=!review;$('rangeSeg').style.display=review?'none':'';
+    if(review){$('banner').className='';$('banner').textContent='后台实测数据：识别、问答及人工审核记录（本机查看）';return loadReviews();}
+    return reloadMap();
+  }
+  $('reviewClose').onclick=function(){detailRequest++;$('reviewDialog').close();};
+  $('reviewFilter').onchange=function(){reviewPage=1;loadReviews();};
+  $('reviewSearchButton').onclick=function(){reviewPage=1;loadReviews();};
+  $('reviewSearch').onkeydown=function(e){if(e.key==='Enter')$('reviewSearchButton').click();};
+  $('reviewRefresh').onclick=function(){loadReviews();};
+  $('reviewPrev').onclick=function(){if(reviewPage>1){reviewPage--;loadReviews();}};
+  $('reviewNext').onclick=function(){if(reviewPage*20<reviewTotal){reviewPage++;loadReviews();}};
+  $('reviewSave').onclick=function(){
+    if(!currentReview)return;var row=currentReview;$('reviewSave').disabled=true;$('reviewSaveMessage').textContent='正在保存…';
+    fetch('/api/reviews',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:row.id,review_status:$('reviewStatus').value,review_note:$('reviewNote').value,revision:row.revision})})
+    .then(jsonResponse).then(function(d){currentReview=d.record;$('reviewSaveMessage').textContent='审核已保存';$('reviewHistory').textContent=JSON.stringify(d.record.history,null,2);loadReviews();})
+    .catch(function(e){$('reviewSaveMessage').textContent=e.message;}).finally(function(){$('reviewSave').disabled=false;});
+  };
+
+  // ---------------- 启动 ----------------
+  reload().then(loadAmap);
+  loadLog();
+})();
+</script>
+</body>
+</html>

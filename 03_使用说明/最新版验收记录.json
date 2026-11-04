@@ -1,0 +1,14 @@
+{
+  "build": "20261020-cleanB",
+  "passed": true,
+  "offline_groups": 9,
+  "browser_pages": [
+    "电脑页面",
+    "手机外形",
+    "后台看板"
+  ],
+  "current_csv_audio_questions": 15,
+  "audio07_decoded": true,
+  "old_materials": "仅保留在90_旧包归档",
+  "scope": "目录整理及当前录音映射、隔离HTTP和浏览器加载检查；不重测在线OCR/模型准确率或真人麦克风"
+}

@@ -1,0 +1,36 @@
+# ===== 密钥与证书：绝对不能提交 =====
+# 注意：只挡「密钥 .txt」和证书，说明文档（密钥填写说明.md）要保留
+*密钥*.txt
+*.key
+*.crt
+*.pem
+*.p12
+!密钥填写说明.md
+
+# ===== 运行时数据：会随使用变化 =====
+*.db
+*.db-journal
+*.sqlite
+ocr日志/
+统计/
+评测结果/
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+envs/
+
+# ===== 系统与编辑器 =====
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/
+
+# ===== 本地临时 =====
+_tests/
+*.log
+*.zip

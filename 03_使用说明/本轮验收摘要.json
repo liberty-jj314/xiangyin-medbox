@@ -1,0 +1,44 @@
+{
+  "build": "20261028-step1",
+  "offline_groups": 14,
+  "normal_questions": 15,
+  "nonzero_dialect_audio_output": true,
+  "ui_flows": [
+    "Central camera and photo button open a real environment-capture file input; gallery removes capture; bottom buttons visually match.",
+    "Location candidates remain uncounted until confirmed; manual correction, memory opt-out and decline preserved in a compact dialog.",
+    "All 15 curated questions across five actual medicine photos retain exact answers, correct dialect files and nonzero decoded audio; pagination preserves full raw text.",
+    "Continue clears question/answer/audio and preserves medicine; change-drug clears identity and image; blank input sends no request.",
+    "Real recorder runs with synthetic microphone, submits original WAV format; language choice and recording animation work.",
+    "Waiting hides answer/audio; cancel aborts the task and late answers cannot reappear or play.",
+    "Quantity, wrong medicine and scope refusals still suppress normal dose audio; no fake AI-check label.",
+    "HTTP failure restores editable question and does not release an old answer.",
+    "Reduced motion respected; phone demo and administration pages remain accessible."
+  ],
+  "viewports": [
+    [
+      320,
+      640
+    ],
+    [
+      360,
+      740
+    ],
+    [
+      390,
+      844
+    ],
+    [
+      430,
+      900
+    ],
+    [
+      1024,
+      850
+    ]
+  ],
+  "data_and_recordings_preserved": true,
+  "paid_cloud_calls": 0,
+  "new_ai_review_implemented": false,
+  "physical_phone_retest_pending": true,
+  "scope": "Actual staged app HTML, real HTTP handlers and MP3 playback; archived cloud OCR/model responses; synthetic microphone/coordinates; Mandarin TTS and additional long-contraindication model output use source fixtures. No paid API calls, no physical phone/GPS or clinical validation."
+}
