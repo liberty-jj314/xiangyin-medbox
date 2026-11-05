@@ -11,6 +11,26 @@
 
 ---
 
+## 界面
+
+<p align="center">
+  <img src="docs/screenshots/01_photo.png" width="160" alt="拍照识药">
+  <img src="docs/screenshots/02_confirm.png" width="160" alt="确认药品">
+  <img src="docs/screenshots/03_ask.png" width="160" alt="按住说话">
+  <img src="docs/screenshots/04_answer.png" width="160" alt="说明书回答">
+  <img src="docs/screenshots/05_refuse.png" width="160" alt="安全拒答">
+  <br/>
+  <sub>① 拍一下药盒　② 确认是哪一盒　③ 按住说话　④ 念说明书原文 + 乡音重听　⑤ 资料里没有就明说</sub>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/06_dashboard.png" width="860" alt="地区问药活跃度看板">
+  <br/>
+  <sub>后台看板：按县统计<strong>问药完成次数</strong>（不是用户人数）。老人手选县，不申请 GPS；演示数据顶部常驻红条</sub>
+</p>
+
+---
+
 ## 解决什么问题
 
 广西 60 岁以上人口超过 800 万，其中农村老人约占七成，多数与子女分居。七成以上老人同时在吃多种药，说明书却看不懂。
@@ -154,6 +174,7 @@ flowchart LR
 │   ├── 03_药品说明书/        # 说明书文字整理稿
 │   └── 密钥填写说明.md       # ★ 跑起来之前先看这个
 ├── 03_使用说明/              # 每轮改动的验收记录
+├── docs/screenshots/         # 界面截图（仅界面示意，数据为演示数据）
 └── ★_1~★_4 启动脚本
 ```
 
